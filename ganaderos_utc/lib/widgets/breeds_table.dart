@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
+
 import '../models/breed_models.dart';
 import '../repositories/breeds_repository.dart';
 import '../views/breeds_view/breed_form.dart';
 
 class BreedsTable extends StatefulWidget {
-  final Function()? onReload;
+  final VoidCallback? onReload;
 
-  const BreedsTable({
-    super.key,
-    this.onReload,
-    required Future<void> Function(dynamic breed) onEdit,
-  });
+  const BreedsTable({super.key, this.onReload});
 
   @override
-  BreedsTableState createState() => BreedsTableState();
+  State<BreedsTable> createState() => BreedsTableState();
 }
 
 class BreedsTableState extends State<BreedsTable> {
@@ -21,6 +18,7 @@ class BreedsTableState extends State<BreedsTable> {
 
   List<Breed> breeds = [];
   bool isLoading = true;
+  bool isRefreshing = false;
 
   int currentPage = 1;
   final int rowsPerPage = 7;
@@ -31,91 +29,186 @@ class BreedsTableState extends State<BreedsTable> {
     loadBreeds();
   }
 
-  /// 🔹 Cargar todas las razas
+  void showMessage(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> loadBreeds() async {
-    setState(() => isLoading = true);
+    if (!mounted || isRefreshing) return;
+
+    isRefreshing = true;
+
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       final data = await BreedsRepository.getAll();
+
+      if (!mounted) return;
+
+      final maxPages = data.isEmpty ? 1 : (data.length / rowsPerPage).ceil();
+
       setState(() {
         breeds = data;
         isLoading = false;
-        currentPage = 1;
+
+        if (currentPage > maxPages) currentPage = maxPages;
+        if (currentPage < 1) currentPage = 1;
       });
     } catch (e) {
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al cargar razas: $e')));
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      showMessage("Error al cargar razas: $e");
+    } finally {
+      isRefreshing = false;
     }
   }
 
-  /// 🔹 Crear nueva raza
-  void _addBreed() {
-    showDialog(
+  Future<void> _addBreed() async {
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => BreedForm(onSave: () => loadBreeds()),
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return BreedForm(
+          onSave: () {
+            Navigator.of(dialogContext).pop(true);
+          },
+        );
+      },
     );
+
+    if (!mounted) return;
+
+    if (ok == true) {
+      await loadBreeds();
+      showMessage("Raza guardada correctamente");
+    }
   }
 
-  /// 🔹 Editar raza
-  void _editBreed(Breed breed) {
-    showDialog(
+  Future<void> _editBreed(Breed breed) async {
+    final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => BreedForm(breed: breed, onSave: () => loadBreeds()),
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return BreedForm(
+          breed: breed,
+          onSave: () {
+            Navigator.of(dialogContext).pop(true);
+          },
+        );
+      },
     );
+
+    if (!mounted) return;
+
+    if (ok == true) {
+      await loadBreeds();
+      showMessage("Raza actualizada correctamente");
+    }
   }
 
-  /// 🔹 Eliminar raza con confirmación
   Future<void> _deleteBreed(int id) async {
+    if (id <= 0) {
+      showMessage("ID inválido");
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder:
-          (_) => AlertDialog(
-            title: const Text('Eliminar Raza'),
-            content: const Text('¿Seguro que deseas eliminar esta raza?'),
+          (dialogContext) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            title: const Text("Eliminar raza"),
+            content: const Text("¿Seguro que desea eliminar esta raza?"),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text("Cancelar"),
               ),
               ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
+                onPressed: () => Navigator.of(dialogContext).pop(true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Eliminar'),
+                child: const Text("Eliminar"),
               ),
             ],
           ),
     );
 
     if (confirm == true) {
-      final success = await repository.deleteBreed(id);
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Raza eliminada correctamente')),
-        );
+      final ok = await repository.deleteBreed(id);
+
+      if (!mounted) return;
+
+      if (ok) {
         await loadBreeds();
+        showMessage("Raza eliminada");
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo eliminar la raza')),
-        );
+        showMessage("No se pudo eliminar");
       }
     }
   }
 
-  /// 🔹 Datos paginados
   List<Breed> get paginatedData {
+    if (breeds.isEmpty) return [];
+
     final start = (currentPage - 1) * rowsPerPage;
-    final end = (start + rowsPerPage);
+    if (start >= breeds.length) return [];
+
+    final end = start + rowsPerPage;
     return breeds.sublist(start, end > breeds.length ? breeds.length : end);
   }
 
   int get totalPages =>
-      (breeds.isEmpty) ? 1 : (breeds.length / rowsPerPage).ceil();
+      breeds.isEmpty ? 1 : (breeds.length / rowsPerPage).ceil();
 
-  void goToPage(int page) => setState(() => currentPage = page);
+  void goToPage(int page) {
+    if (!mounted) return;
+    if (page < 1 || page > totalPages) return;
+
+    setState(() {
+      currentPage = page;
+    });
+  }
+
+  List<int> _pagesWindow({
+    required int current,
+    required int total,
+    required int maxButtons,
+  }) {
+    if (total <= maxButtons) {
+      return List.generate(total, (i) => i + 1);
+    }
+
+    final half = maxButtons ~/ 2;
+    int start = current - half;
+    int end = current + half;
+
+    if (start < 1) {
+      start = 1;
+      end = maxButtons;
+    }
+
+    if (end > total) {
+      end = total;
+      start = total - maxButtons + 1;
+    }
+
+    return [for (int i = start; i <= end; i++) i];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final bool isMobile = w < 700;
+
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -125,199 +218,243 @@ class BreedsTableState extends State<BreedsTable> {
         return Container(
           width: constraints.maxWidth,
           height: constraints.maxHeight,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isMobile ? 12 : 16),
           decoration: const BoxDecoration(
             image: DecorationImage(
               image: AssetImage('assets/images/fondo1.jpg'),
               fit: BoxFit.cover,
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              /// 🔹 Barra de acciones superior
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Agregar Raza'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 96, 227, 2),
-                      foregroundColor: Colors.black87,
+          child: SafeArea(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.spaceBetween,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text("Agregar Raza"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 96, 227, 2),
+                        foregroundColor: Colors.black87,
+                      ),
+                      onPressed: _addBreed,
                     ),
-                    onPressed: _addBreed,
-                  ),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Recargar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(136, 110, 223, 5),
-                      foregroundColor: Colors.black87,
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.refresh),
+                      label: const Text("Recargar"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(136, 110, 223, 5),
+                        foregroundColor: Colors.black87,
+                      ),
+                      onPressed: loadBreeds,
                     ),
-                    onPressed: loadBreeds,
-                  ),
-                ],
-              ),
+                  ],
+                ),
 
-              const SizedBox(height: 16),
+                const SizedBox(height: 12),
 
-              /// 🔹 Tabla principal
-              Expanded(
-                child:
-                    breeds.isEmpty
-                        ? const Center(
-                          child: Text(
-                            'No hay razas registradas.',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black54,
+                Expanded(
+                  child:
+                      breeds.isEmpty
+                          ? const Center(
+                            child: Text(
+                              "No hay razas registradas.",
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.black54,
+                              ),
                             ),
-                          ),
-                        )
-                        : SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              minWidth: constraints.maxWidth,
-                            ),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.vertical,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.88),
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withOpacity(0.2),
-                                      blurRadius: 6,
-                                      offset: const Offset(0, 3),
+                          )
+                          : SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minWidth: constraints.maxWidth,
+                              ),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.vertical,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withOpacity(0.88),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.2),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 3),
+                                      ),
+                                    ],
+                                  ),
+                                  child: DataTable(
+                                    columnSpacing: isMobile ? 18 : 40,
+                                    headingRowColor: WidgetStateProperty.all(
+                                      Colors.black.withOpacity(0.85),
                                     ),
-                                  ],
-                                ),
-                                child: DataTable(
-                                  columnSpacing: 40,
-                                  headingRowColor: WidgetStateProperty.all(
-                                    Colors.black.withOpacity(0.85),
-                                  ),
-                                  headingTextStyle: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                  dataRowColor: WidgetStateProperty.resolveWith<
-                                    Color?
-                                  >((Set<WidgetState> states) {
-                                    if (states.contains(WidgetState.selected)) {
-                                      return Colors.grey.withOpacity(0.3);
-                                    }
-                                    return Colors.white.withOpacity(0.9);
-                                  }),
-                                  columns: const [
-                                    DataColumn(label: Text('ID')),
-                                    DataColumn(label: Text('Nombre')),
-                                    DataColumn(label: Text('Descripción')),
-                                    DataColumn(label: Text('Acciones')),
-                                  ],
-                                  rows:
-                                      paginatedData.map((breed) {
-                                        return DataRow(
-                                          cells: [
-                                            DataCell(
-                                              Text(breed.id?.toString() ?? '-'),
-                                            ),
-                                            DataCell(Text(breed.name)),
-                                            DataCell(Text(breed.description)),
-                                            DataCell(
-                                              Row(
-                                                children: [
-                                                  IconButton(
-                                                    icon: const Icon(
-                                                      Icons.edit,
-                                                      color: Colors.blue,
-                                                    ),
-                                                    tooltip: 'Editar raza',
-                                                    onPressed:
-                                                        () => _editBreed(breed),
-                                                  ),
-                                                  IconButton(
-                                                    icon: const Icon(
-                                                      Icons.delete,
-                                                      color: Colors.red,
-                                                    ),
-                                                    tooltip: 'Eliminar raza',
-                                                    onPressed:
-                                                        () => _deleteBreed(
-                                                          breed.id ?? 0,
-                                                        ),
-                                                  ),
-                                                ],
+                                    headingTextStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    columns: const [
+                                      DataColumn(label: Text("ID")),
+                                      DataColumn(label: Text("Nombre")),
+                                      DataColumn(label: Text("Descripción")),
+                                      DataColumn(label: Text("Acciones")),
+                                    ],
+                                    rows:
+                                        paginatedData.map((breed) {
+                                          final id = breed.id ?? 0;
+
+                                          return DataRow(
+                                            cells: [
+                                              DataCell(
+                                                Text(id > 0 ? "$id" : "-"),
                                               ),
-                                            ),
-                                          ],
-                                        );
-                                      }).toList(),
+                                              DataCell(
+                                                SizedBox(
+                                                  width: isMobile ? 180 : 220,
+                                                  child: Text(
+                                                    breed.name,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                SizedBox(
+                                                  width: isMobile ? 220 : 420,
+                                                  child: Text(
+                                                    breed.description,
+                                                    maxLines: isMobile ? 2 : 3,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ),
+                                              DataCell(
+                                                isMobile
+                                                    ? PopupMenuButton<String>(
+                                                      onSelected: (v) {
+                                                        if (v == "edit") {
+                                                          _editBreed(breed);
+                                                        }
+                                                        if (v == "delete") {
+                                                          _deleteBreed(id);
+                                                        }
+                                                      },
+                                                      itemBuilder:
+                                                          (_) => const [
+                                                            PopupMenuItem(
+                                                              value: "edit",
+                                                              child: Text(
+                                                                "Editar",
+                                                              ),
+                                                            ),
+                                                            PopupMenuItem(
+                                                              value: "delete",
+                                                              child: Text(
+                                                                "Eliminar",
+                                                              ),
+                                                            ),
+                                                          ],
+                                                      child: const Icon(
+                                                        Icons.more_vert,
+                                                      ),
+                                                    )
+                                                    : Row(
+                                                      children: [
+                                                        IconButton(
+                                                          icon: const Icon(
+                                                            Icons.edit,
+                                                            color: Colors.blue,
+                                                          ),
+                                                          onPressed:
+                                                              () => _editBreed(
+                                                                breed,
+                                                              ),
+                                                        ),
+                                                        IconButton(
+                                                          icon: const Icon(
+                                                            Icons.delete,
+                                                            color: Colors.red,
+                                                          ),
+                                                          onPressed:
+                                                              () =>
+                                                                  _deleteBreed(
+                                                                    id,
+                                                                  ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                              ),
+                                            ],
+                                          );
+                                        }).toList(),
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-              ),
+                ),
 
-              const SizedBox(height: 12),
-              _buildPagination(),
-            ],
+                const SizedBox(height: 10),
+                _buildPagination(isMobile),
+                const SizedBox(height: 10),
+              ],
+            ),
           ),
         );
       },
     );
   }
 
-  /// 🔹 Paginación inferior
-  Widget _buildPagination() {
+  Widget _buildPagination(bool isMobile) {
     if (totalPages <= 1) return const SizedBox.shrink();
 
-    List<Widget> pageButtons = [];
-
-    for (int i = 1; i <= totalPages; i++) {
-      pageButtons.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              backgroundColor:
-                  i == currentPage
-                      ? Colors.black87
-                      : Colors.white.withOpacity(0.7),
-              foregroundColor: i == currentPage ? Colors.white : Colors.black,
-              side: const BorderSide(color: Colors.black54),
-            ),
-            onPressed: () => goToPage(i),
-            child: Text('$i'),
-          ),
-        ),
-      );
-    }
-
-    pageButtons.add(
-      Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: OutlinedButton(
-          onPressed:
-              currentPage < totalPages ? () => goToPage(currentPage + 1) : null,
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Colors.white.withOpacity(0.7),
-            foregroundColor: Colors.black,
-          ),
-          child: const Text('Siguiente'),
-        ),
-      ),
+    final pagesToShow = _pagesWindow(
+      current: currentPage,
+      total: totalPages,
+      maxButtons: isMobile ? 5 : 10,
     );
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
-        children: pageButtons,
+        children: [
+          OutlinedButton(
+            onPressed: currentPage > 1 ? () => goToPage(currentPage - 1) : null,
+            child: const Text("Anterior"),
+          ),
+          const SizedBox(width: 8),
+          ...pagesToShow.map((p) {
+            final selected = p == currentPage;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  backgroundColor:
+                      selected ? Colors.black87 : Colors.white.withOpacity(0.7),
+                  foregroundColor: selected ? Colors.white : Colors.black,
+                ),
+                onPressed: () => goToPage(p),
+                child: Text("$p"),
+              ),
+            );
+          }),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed:
+                currentPage < totalPages
+                    ? () => goToPage(currentPage + 1)
+                    : null,
+            child: const Text("Siguiente"),
+          ),
+        ],
       ),
     );
   }

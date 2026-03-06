@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:ganaderos_utc/views/cattle_view/cattle_view.dart';
+import 'package:ganaderos_utc/views/maps_view/companies_map_view.dart';
 import 'package:ganaderos_utc/views/stats_view/stats_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
+
 // vistas...
 import 'views/inicio_view/inicio_view.dart';
 import 'views/breeds_view/breeds_view.dart';
@@ -20,13 +22,24 @@ import 'views/weight_view/weight_view.dart';
 import 'widgets/login_widget.dart';
 import 'widgets/register_widget.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await initializeDateFormatting('es_EC', null); // si falla usa 'es_ES'
 
-  // Leer estado de login
+  // ✅ Inicialización de locale con fallback (evita fallos raros en web)
+  try {
+    await initializeDateFormatting('es_EC', null);
+  } catch (_) {
+    await initializeDateFormatting('es_ES', null);
+  }
+
+  // ✅ Leer estado de login de forma segura
   final prefs = await SharedPreferences.getInstance();
   final bool isLogged = prefs.getBool('isLoggedIn') ?? false;
+
+  // ✅ Si quieres, puedes validar aquí otras claves críticas (token/user)
+  // final token = prefs.getString('token');
+  // final userJson = prefs.getString('user');
+  // final bool sessionOk = isLogged && token != null && token.isNotEmpty && userJson != null && userJson.isNotEmpty;
 
   runApp(GanaderosUTCApp(initialRoute: isLogged ? '/inicio' : '/login'));
 }
@@ -60,7 +73,14 @@ class GanaderosUTCApp extends StatelessWidget {
         '/vaccines': (context) => const VaccineView(),
         '/weight': (context) => const WeightView(),
         '/stats': (_) => const StatsView(),
+        '/companies-map': (context) => const CompaniesMapView(),
       },
+
+      // ✅ Si alguna ruta no existe, evita crasheos y vuelve a login
+      onUnknownRoute:
+          (_) => MaterialPageRoute(
+            builder: (_) => const Scaffold(body: LoginWidget()),
+          ),
     );
   }
 }

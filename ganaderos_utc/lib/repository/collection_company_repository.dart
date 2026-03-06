@@ -4,9 +4,9 @@ import '../settings/api_connections.dart';
 class CollectionCattleRepository {
   static const String _basePath = "/collection";
 
-  // Obtener recolecciones por CATTLE ID
-  //  Intenta filtrar por API
-  // Si la API devuelve todo, filtra localmente como respaldo
+  /// ================================
+  /// OBTENER RECOLECCIONES POR CATTLE
+  /// ================================
   static Future<List<Collection>> getAllByCattle(int cattleId) async {
     try {
       final dynamic response = await ApiConnection.get(
@@ -15,111 +15,98 @@ class CollectionCattleRepository {
 
       if (response == null) return [];
 
-      List<Collection> parsed = [];
+      List<dynamic> rawList = [];
 
-      // API devuelve directamente una lista
+      // API puede devolver LIST o {data:[]}
       if (response is List) {
-        parsed =
-            response
-                .map(
-                  (item) => Collection.fromMap(Map<String, dynamic>.from(item)),
-                )
-                .toList();
+        rawList = response;
+      } else if (response is Map && response['data'] is List) {
+        rawList = response['data'];
       }
 
-      // API devuelve {"data":[...]}
-      if (response is Map && response['data'] is List) {
-        parsed =
-            (response['data'] as List)
-                .map(
-                  (item) => Collection.fromMap(Map<String, dynamic>.from(item)),
-                )
-                .toList();
-      }
+      final parsed =
+          rawList
+              .map((e) => Collection.fromMap(Map<String, dynamic>.from(e)))
+              .toList();
 
-      // Respaldo: si por algún motivo viene mezclado, filtramos en Flutter
+      // filtro de respaldo si API falla
       return parsed.where((c) => c.cattleId == cattleId).toList();
     } catch (e) {
-      print(" Error al obtener recolecciones por cattleId=$cattleId: $e");
+      print("❌ Error al obtener recolecciones por cattleId=$cattleId: $e");
       return [];
     }
   }
 
-  // Crear recolección (OBLIGA a incluir cattleId)
+  /// ================================
+  /// CREAR RECOLECCIÓN
+  /// ================================
   static Future<Collection?> createForCattle(Collection collection) async {
     try {
-      final int cattleId = collection.cattleId;
-      // ignore: unnecessary_null_comparison
-      if (cattleId == null || cattleId <= 0) {
+      if (collection.cattleId <= 0) {
         throw Exception("cattleId es requerido para crear una recolección.");
       }
 
-      final dynamic response = await ApiConnection.post(
-        _basePath,
-        collection.toMap(),
-      );
+      final Map<String, dynamic> data = collection.toMap();
 
-      if (response is Map) {
-        return Collection.fromMap(Map<String, dynamic>.from(response));
-      }
+      // debug útil
+      print("📤 POST Collection: $data");
 
-      print(" Respuesta inesperada al crear recolección: $response");
-      return null;
+      final response = await ApiConnection.post(_basePath, data);
+
+      if (response == null) return null;
+
+      return Collection.fromMap(Map<String, dynamic>.from(response));
     } catch (e) {
-      print(" Error al crear recolección: $e");
+      print("❌ Error al crear recolección: $e");
       return null;
     }
   }
 
-  /// ✅ Actualizar recolección
+  /// ================================
+  /// ACTUALIZAR RECOLECCIÓN
+  /// ================================
   static Future<bool> updateForCattle(Collection collection) async {
     try {
       final id = collection.id;
-      if (id == null) return false;
 
-      // (opcional pero recomendado) validar cattleId en update también
-      final int cattleId = collection.cattleId;
-      // ignore: unnecessary_null_comparison
-      if (cattleId == null || cattleId <= 0) {
+      if (id == null) {
+        print("❌ No se puede actualizar: id es null");
+        return false;
+      }
+
+      if (collection.cattleId <= 0) {
         throw Exception(
           "cattleId es requerido para actualizar una recolección.",
         );
       }
 
-      final dynamic response = await ApiConnection.patch(
-        "$_basePath/$id",
-        collection.toMap(),
-      );
+      final Map<String, dynamic> data = collection.toMap();
 
-      // Soporta respuestas comunes de APIs
-      if (response is int) return response > 0;
-      if (response is bool) return response;
-      if (response is Map && response['success'] == true) return true;
-      if (response is Map && response['id'] != null) return true;
+      print("📤 PATCH Collection ($id): $data");
 
-      print(" Respuesta inesperada al actualizar: $response");
-      return false;
+      final int result = await ApiConnection.patch("$_basePath/$id", data);
+
+      return result > 0;
     } catch (e) {
-      print(" Error al actualizar recolección: $e");
+      print("❌ Error al actualizar recolección: $e");
       return false;
     }
   }
 
-  /// ✅ Eliminar recolección
+  /// ================================
+  /// ELIMINAR RECOLECCIÓN
+  /// ================================
   static Future<bool> deleteForCattle(int id) async {
     try {
       if (id <= 0) return false;
 
-      final dynamic response = await ApiConnection.delete("$_basePath/$id");
+      print("🗑 DELETE Collection: $id");
 
-      if (response is int) return response > 0;
-      if (response is bool) return response;
-      if (response is Map && response['success'] == true) return true;
+      final int result = await ApiConnection.delete("$_basePath/$id");
 
-      print(" Respuesta inesperada al eliminar: $response");
-      return false;
+      return result > 0;
     } catch (e) {
-      print(" Error al eliminar recolección: $e");
+      print("❌ Error al eliminar recolección: $e");
       return false;
     }
   }

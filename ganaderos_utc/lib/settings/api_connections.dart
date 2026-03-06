@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -16,7 +18,9 @@ class ApiConnection {
     String password,
   ) async {
     try {
-      if (!await _isConnected()) return null;
+      if (!await _isConnected()) {
+        return {"error": "Sin conexión a internet"};
+      }
 
       final uri = Uri.parse("$url/users/auth");
       final headers = {
@@ -31,55 +35,102 @@ class ApiConnection {
 
       final response = await http
           .post(uri, headers: headers, body: body)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 20));
 
-      // Éxito esperado de tu API
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final decoded = json.decode(response.body);
+        if (decoded is Map) return Map<String, dynamic>.from(decoded);
+        return {"error": "Respuesta inválida del servidor"};
       }
 
-      print("LOGIN ERROR: ${response.statusCode} - ${response.body}");
-      return null;
+      return {
+        "error": "Login falló (${response.statusCode})",
+        "detail": response.body,
+      };
+    } on TimeoutException {
+      return {"error": "Tiempo de espera agotado (servidor lento o caído)"};
     } catch (e) {
-      print("LOGIN EXCEPTION: $e");
-      return null;
+      return {"error": "Error en login: $e"};
     }
   }
 
   // ---------------------------------------------------------------------------
-  // 🔵 REGISTER - POST /api/users/register
+  // 🔵 REGISTER - prueba varias rutas típicas porque NO tienes backend
   // ---------------------------------------------------------------------------
   static Future<Map<String, dynamic>?> register(
-    String username,
-    String password,
+    Map<String, dynamic> payload,
   ) async {
     try {
-      if (!await _isConnected()) return null;
+      if (!await _isConnected()) {
+        return {"error": "Sin conexión a internet"};
+      }
 
-      final uri = Uri.parse("$url/users/register");
       final headers = {
         'Accept': 'application/json',
         'Content-Type': 'application/json; charset=UTF-8',
       };
 
-      final body = json.encode({
-        "username": username.trim(),
-        "password": password.trim(),
-      });
+      // NO borres company_id/role/etc
+      final bodyMap = Map<String, dynamic>.from(payload);
+      bodyMap.removeWhere((k, v) => v == null);
 
-      final response = await http
-          .post(uri, headers: headers, body: body)
-          .timeout(const Duration(seconds: 10));
+      // ✅ rutas comunes (prueba todas)
+      final endpointsToTry = <String>[
+        "/users/register",
+        "/users", // POST /users (muy común)
+        "/auth/register",
+        "/register",
+        "/user/register",
+        "/user",
+      ];
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return json.decode(response.body);
+      Map<String, dynamic>? lastError;
+
+      for (final ep in endpointsToTry) {
+        final uri = Uri.parse(url + ep);
+
+        try {
+          final response = await http
+              .post(uri, headers: headers, body: json.encode(bodyMap))
+              .timeout(const Duration(seconds: 20));
+
+          if (response.statusCode == 200 || response.statusCode == 201) {
+            final decoded = json.decode(response.body);
+            if (decoded is Map) return Map<String, dynamic>.from(decoded);
+            return {"success": true, "message": "Registrado correctamente"};
+          }
+
+          // 404 => endpoint no existe, prueba siguiente
+          if (response.statusCode == 404) {
+            lastError = {
+              "error": "Endpoint no existe: $ep",
+              "detail": response.body,
+            };
+            continue;
+          }
+
+          // Otros errores => devolvemos ya (porque el endpoint sí existe)
+          return {
+            "error": "Registro falló (${response.statusCode}) en $ep",
+            "detail": response.body,
+          };
+        } on TimeoutException {
+          lastError = {"error": "Timeout en $ep"};
+          continue;
+        } catch (e) {
+          // En web, CORS o bloqueo del navegador suele caer aquí
+          lastError = {"error": "Error llamando $ep: $e"};
+          continue;
+        }
       }
 
-      print("REGISTER ERROR: ${response.statusCode} - ${response.body}");
-      return null;
+      return lastError ??
+          {
+            "error":
+                "No se encontró endpoint de registro. El backend no expone ruta pública.",
+          };
     } catch (e) {
-      print("REGISTER EXCEPTION: $e");
-      return null;
+      return {"error": "Error general en register: $e"};
     }
   }
 

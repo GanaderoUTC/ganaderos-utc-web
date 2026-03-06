@@ -11,7 +11,7 @@ class Navbar extends StatefulWidget implements PreferredSizeWidget {
   State<Navbar> createState() => _NavbarState();
 }
 
-class _NavbarState extends State<Navbar> {
+class _NavbarState extends State<Navbar> with RouteAware {
   bool _isLogged = false;
 
   @override
@@ -20,7 +20,7 @@ class _NavbarState extends State<Navbar> {
     _loadLoginStatus();
   }
 
-  /// ✔ Cargar estado de sesión desde SharedPreferences
+  /// 🔹 Verifica sesión
   Future<void> _loadLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     final logged = prefs.getBool('isLoggedIn') ?? false;
@@ -30,23 +30,39 @@ class _NavbarState extends State<Navbar> {
     }
   }
 
-  /// ✔ Logout eliminando datos de sesión
+  /// 🔹 Logout
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('isLoggedIn');
     await prefs.remove('user');
 
     if (!mounted) return;
-
     Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bool isMobile = width < 600;
+
     return AppBar(
-      title: const Text('GANADEROS UTC'),
-      centerTitle: true,
       elevation: 4,
+      centerTitle: true,
+
+      /// ☰ Drawer siempre visible
+      leading: Builder(
+        builder:
+            (context) => IconButton(
+              icon: const Icon(Icons.menu, color: Colors.white),
+              onPressed: () => Scaffold.of(context).openDrawer(),
+            ),
+      ),
+
+      title: const Text(
+        'UTC GEN APP',
+        style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1),
+      ),
+
       backgroundColor: Colors.transparent,
       flexibleSpace: Container(
         decoration: const BoxDecoration(
@@ -57,21 +73,35 @@ class _NavbarState extends State<Navbar> {
           ),
         ),
       ),
+
       actions: [
-        TextButton.icon(
-          onPressed:
-              _isLogged
-                  ? _logout
-                  : () => Navigator.pushReplacementNamed(context, '/login'),
+        IconButton(
+          tooltip: _isLogged ? 'Cerrar sesión' : 'Iniciar sesión',
           icon: Icon(
             _isLogged ? Icons.logout : Icons.login,
             color: Colors.white,
           ),
-          label: Text(
-            _isLogged ? 'Cerrar Sesión' : 'Iniciar Sesión',
-            style: const TextStyle(color: Colors.white),
-          ),
+          onPressed:
+              _isLogged
+                  ? _logout
+                  : () => Navigator.pushReplacementNamed(context, '/login'),
         ),
+
+        /// 🔹 Mostrar texto SOLO en pantallas grandes
+        if (!isMobile)
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton(
+              onPressed:
+                  _isLogged
+                      ? _logout
+                      : () => Navigator.pushReplacementNamed(context, '/login'),
+              child: Text(
+                _isLogged ? 'Cerrar sesión' : 'Iniciar sesión',
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
       ],
     );
   }

@@ -2,14 +2,16 @@ import '../models/categories_models.dart';
 import '../settings/api_connections.dart';
 
 class CategoriesRepository {
-  static const String endpoint = "/categories"; // Ajusta según tu API real
+  static const String endpoint = "/categories";
 
-  // Obtener lista de categorías desde la API
+  // Obtener lista de categorías desde la API (robusto)
   static Future<List<Category>> getAll() async {
     try {
-      final List<Map<String, dynamic>> dataList = await ApiConnection.get(
+      // ✅ usa método robusto (List o {data:[]})
+      final List<Map<String, dynamic>> dataList = await ApiConnection.getList(
         endpoint,
       );
+
       return dataList.map((data) => Category.fromMap(data)).toList();
     } catch (e) {
       print("Error al obtener categorías: $e");
@@ -22,6 +24,10 @@ class CategoriesRepository {
     try {
       final response = await ApiConnection.post(endpoint, category.toMap());
       if (response != null) {
+        // ✅ si viene {data:{...}} también funciona
+        if (response['data'] is Map) {
+          return Category.fromMap(Map<String, dynamic>.from(response['data']));
+        }
         return Category.fromMap(response);
       }
     } catch (e) {
@@ -34,11 +40,14 @@ class CategoriesRepository {
   Future<bool> update(Category category) async {
     if (category.id == null) return false;
     try {
-      final int result = await ApiConnection.patch(
-        '$endpoint/${category.id}',
-        category.toMap(),
-      );
-      return result > 0;
+      // ✅ patch ahora es bool (no int)
+      final bool ok =
+          (await ApiConnection.patch(
+                '$endpoint/${category.id}',
+                category.toMap(),
+              ))
+              as bool;
+      return ok;
     } catch (e) {
       print("Error al actualizar categoría: $e");
       return false;
@@ -48,8 +57,9 @@ class CategoriesRepository {
   // Eliminar una categoría por ID
   Future<bool> delete(int id) async {
     try {
-      final int result = await ApiConnection.delete('$endpoint/$id');
-      return result > 0;
+      // ✅ delete ahora es bool (no int)
+      final bool ok = (await ApiConnection.delete('$endpoint/$id')) as bool;
+      return ok;
     } catch (e) {
       print("Error al eliminar categoría: $e");
       return false;

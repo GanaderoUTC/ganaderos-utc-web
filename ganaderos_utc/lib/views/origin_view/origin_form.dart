@@ -86,90 +86,107 @@ class _OriginFormState extends State<OriginForm> {
   Widget build(BuildContext context) {
     final isEditing = widget.origin != null;
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      title: Text(
-        isEditing ? 'Editar Origen' : 'Agregar Nuevo Origen',
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Color(0xFF2C3E50),
-        ),
-      ),
-      content: Form(
-        key: _formKey,
-        child: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Campo: Nombre
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre del origen',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.public),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'El nombre es obligatorio';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 15),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 600;
 
-              // Campo: Descripción
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.description_outlined),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 15),
-
-              // Checkbox: Sincronización
-              CheckboxListTile(
-                title: const Text('Sincronizado'),
-                value: _sync,
-                onChanged: (value) {
-                  setState(() {
-                    _sync = value ?? false;
-                  });
-                },
-                activeColor: Colors.green.shade700,
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-            ],
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        ),
-      ),
-
-      // 🔹 Botones inferiores
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.red)),
-        ),
-        ElevatedButton.icon(
-          onPressed: _saveForm,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade700,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
+          insetPadding: const EdgeInsets.all(16),
+          title: Text(
+            isEditing ? 'Editar Origen' : 'Agregar Nuevo Origen',
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF2C3E50),
             ),
           ),
-          icon: const Icon(Icons.save, color: Colors.white),
-          label: Text(
-            isEditing ? 'Actualizar' : 'Guardar',
-            style: const TextStyle(color: Colors.white),
+          content: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isMobile ? double.infinity : 420,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Nombre
+                    TextFormField(
+                      controller: _nameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre del origen',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.public),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'El nombre es obligatorio';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Descripción
+                    TextFormField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Descripción',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.description_outlined),
+                      ),
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Sync
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Sincronizado'),
+                      value: _sync,
+                      onChanged: (value) {
+                        setState(() => _sync = value ?? false);
+                      },
+                      activeColor: Colors.green.shade700,
+                      controlAffinity: ListTileControlAffinity.leading,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ],
+
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+            ElevatedButton.icon(
+              onPressed: _saveForm,
+              icon: const Icon(Icons.save, color: Colors.white),
+              label: Text(
+                isEditing ? 'Actualizar' : 'Guardar',
+                style: const TextStyle(color: Colors.white),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade700,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }

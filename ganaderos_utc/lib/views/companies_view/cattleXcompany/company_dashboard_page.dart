@@ -1,5 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:ganaderos_utc/reports/report_service.dart';
+
+import '../../../models/company_models.dart';
+import '../../../models/cattle_models.dart';
+
+import '../../../widgets/footer.dart';
+
 import 'package:ganaderos_utc/repository/cattle_company_repository.dart';
+
 import 'package:ganaderos_utc/views/companies_view/cattleXcompany/CattleTableViewByCompany.dart';
 import 'package:ganaderos_utc/views/companies_view/collectionXcattleXcompany/CollectionTableViewByCattle.dart';
 import 'package:ganaderos_utc/views/companies_view/checkupXcompany/CheckupTableViewByCattle.dart';
@@ -7,9 +15,7 @@ import 'package:ganaderos_utc/views/companies_view/diagnosisXcompany/diagnosis_t
 import 'package:ganaderos_utc/views/companies_view/vaccineXcompany/VaccineTableViewByCattle.dart';
 import 'package:ganaderos_utc/views/companies_view/weightXcompany/WeightTableViewByCattle.dart';
 import 'package:ganaderos_utc/views/companies_view/userXcompany/UserTableViewByCompany.dart';
-import '../../../models/company_models.dart';
-import '../../../models/cattle_models.dart';
-import '../../../widgets/footer.dart';
+
 import '../companies_view.dart';
 
 class CompanyDashboardPage extends StatefulWidget {
@@ -32,27 +38,64 @@ class _CompanyDashboardPageState extends State<CompanyDashboardPage> {
   }
 
   Future<void> _loadCattle() async {
-    if (!mounted) return;
-    setState(() => loading = true);
-
     try {
       final data = await CattleCompanyRepository.getAllByCompany(
         widget.company.id!,
       );
 
-      if (!mounted) return;
       setState(() {
         cattleList = data;
         loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
       setState(() => loading = false);
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error al cargar ganado: $e')));
+      ).showSnackBar(SnackBar(content: Text("Error cargando ganado: $e")));
     }
   }
+
+  /// ---------------------------
+  /// PDF REPORT
+  /// ---------------------------
+  Future<void> _exportPdf() async {
+    if (cattleList.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No hay ganado para exportar")),
+      );
+      return;
+    }
+
+    final rows =
+        cattleList
+            .map(
+              (c) => {
+                "Nombre": c.name,
+                "Código": c.code,
+                "Raza": c.breed?.name ?? "",
+                "Género": c.gender,
+                "Fecha Registro": c.date,
+              },
+            )
+            .toList();
+
+    await ReportService.printCompanyReport(
+      companyName: widget.company.companyName,
+      title: "Reporte General de Ganado",
+      from: DateTime.now().subtract(const Duration(days: 30)),
+      to: DateTime.now(),
+      rows: rows,
+      summary: {
+        "Empresa": widget.company.companyName,
+        "Total de ganado": "${cattleList.length}",
+      },
+    );
+  }
+
+  /// ---------------------------
+  /// NAVIGATION
+  /// ---------------------------
 
   void _openCattleTable() {
     Navigator.push(
@@ -63,398 +106,329 @@ class _CompanyDashboardPageState extends State<CompanyDashboardPage> {
     ).then((_) => _loadCattle());
   }
 
-  void _openCollectionByCattle(Cattle item) {
-    if (item.id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Este ganado no tiene ID válido')),
-      );
-      return;
-    }
-
+  void _openCollection(Cattle cattle) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (_) => CollectionTableViewByCattle(
-              cattleId: item.id!,
-              cattleName: item.name,
+              cattleId: cattle.id!,
+              cattleName: cattle.name,
             ),
       ),
     );
   }
 
-  void _openCheckupByCattle(Cattle item) {
-    if (item.id == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Este ganado no tiene ID válido')),
-      );
-      return;
-    }
-
+  void _openCheckup(Cattle cattle) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (_) => CheckupTableViewByCattle(
-              cattleId: item.id!,
-              cattleName: item.name,
+              cattleId: cattle.id!,
+              cattleName: cattle.name,
             ),
       ),
     );
   }
 
+  /// ---------------------------
+  /// RESPONSIVE
+  /// ---------------------------
+
+  int _columns(double width) {
+    if (width < 600) return 1;
+    if (width < 1000) return 2;
+    return 3;
+  }
+
+  double _ratio(double width) {
+    if (width < 600) return 1.35;
+    if (width < 1000) return 1.20;
+    return 1.15;
+  }
+
+  EdgeInsets _padding(double width) {
+    if (width < 600) return const EdgeInsets.symmetric(horizontal: 12);
+    return const EdgeInsets.symmetric(horizontal: 20);
+  }
+
+  ButtonStyle _btnStyle() {
+    return ElevatedButton.styleFrom(
+      backgroundColor: Colors.teal.shade600,
+      foregroundColor: Colors.white,
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
+  }
+
+  ButtonStyle _chipStyle() {
+    return ElevatedButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+    );
+  }
+
+  /// ---------------------------
+  /// UI
+  /// ---------------------------
+
   @override
   Widget build(BuildContext context) {
-    final String companyName = widget.company.companyName;
+    final width = MediaQuery.of(context).size.width;
+    final cols = _columns(width);
 
     return Scaffold(
-      // ✅ importante para que no “pinte” fondo sólido detrás
-      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: Colors.green[700],
-        title: const Text('Dashboard de Ganado'),
+        title: const Text("Registros del Ganado"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf),
+            tooltip: "Exportar PDF",
+            onPressed: _exportPdf,
+          ),
+        ],
       ),
+
       body: Stack(
         children: [
-          // ✅ Fondo
           Positioned.fill(
             child: Image.asset(
-              'assets/images/fondo_general.jpg',
+              "assets/images/fondo_general.jpg",
               fit: BoxFit.cover,
-              alignment: Alignment.center,
             ),
           ),
 
-          // ✅ Overlay suave (mejor lectura)
-          Positioned.fill(
-            child: Container(color: Colors.white.withOpacity(0.08)),
-          ),
-
-          // ✅ Contenido
           SafeArea(
             child: Column(
               children: [
                 const SizedBox(height: 20),
 
+                /// BIENVENIDA
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: _padding(width),
                   child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 18),
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: Colors.green[100]!.withOpacity(0.88),
+                      color: Colors.green[100]!.withOpacity(0.9),
                       borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 10,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                      border: Border.all(color: Colors.white.withOpacity(0.35)),
                     ),
                     child: Text(
-                      "Bienvenido, $companyName 👋",
+                      "Bienvenido, ${widget.company.companyName}",
                       textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 26,
+                      style: TextStyle(
+                        fontSize: width < 600 ? 20 : 26,
                         fontWeight: FontWeight.bold,
-                        color: Color.fromARGB(255, 62, 143, 146),
                       ),
                     ),
                   ),
                 ),
 
-                const SizedBox(height: 15),
+                const SizedBox(height: 12),
 
+                /// BOTONES SUPERIORES
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
+                  padding: _padding(width),
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
                     children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.business),
-                          label: const Text('Regresar a Empresas'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal.shade600,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const CompaniesView(),
-                              ),
-                            );
-                          },
-                        ),
+                      ElevatedButton.icon(
+                        style: _btnStyle(),
+                        icon: const Icon(Icons.business),
+                        label: const Text("Regresar a Empresas"),
+                        onPressed: () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const CompaniesView(),
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.table_view),
-                          label: const Text('Ver Tabla de Ganado'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal.shade600,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: _openCattleTable,
-                        ),
+                      ElevatedButton.icon(
+                        style: _btnStyle(),
+                        icon: const Icon(Icons.table_chart),
+                        label: const Text("Ver tabla ganado"),
+                        onPressed: _openCattleTable,
                       ),
-                      const SizedBox(width: 15),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          icon: const Icon(Icons.manage_accounts),
-                          label: Text(
-                            'Administración de usuario (${widget.company.companyName})',
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.teal.shade600,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder:
-                                    (_) => UserTableViewByCompany(
-                                      companyId: widget.company.id!,
-                                      companyName: widget.company.companyName,
-                                    ),
-                              ),
-                            );
-                          },
-                        ),
+                      ElevatedButton.icon(
+                        style: _btnStyle(),
+                        icon: const Icon(Icons.manage_accounts),
+                        label: const Text("Usuarios de empresa"),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder:
+                                  (_) => UserTableViewByCompany(
+                                    companyId: widget.company.id!,
+                                    companyName: widget.company.companyName,
+                                  ),
+                            ),
+                          );
+                        },
+                      ),
+                      ElevatedButton.icon(
+                        style: _btnStyle(),
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Text("Exportar PDF"),
+                        onPressed: _exportPdf,
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
+                /// GRID GANADO
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    padding: _padding(width),
                     child:
                         loading
                             ? const Center(child: CircularProgressIndicator())
-                            : cattleList.isEmpty
-                            ? const Center(
-                              child: Text(
-                                "No hay ganado registrado.",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontStyle: FontStyle.italic,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                            )
-                            : LayoutBuilder(
-                              builder: (context, constraints) {
-                                final maxCrossAxisExtent =
-                                    constraints.maxWidth / 3.2;
+                            : GridView.builder(
+                              itemCount: cattleList.length,
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: cols,
+                                    mainAxisSpacing: 14,
+                                    crossAxisSpacing: 14,
+                                    childAspectRatio: _ratio(width),
+                                  ),
+                              itemBuilder: (context, index) {
+                                final item = cattleList[index];
 
-                                return GridView.builder(
-                                  itemCount: cattleList.length,
-                                  gridDelegate:
-                                      SliverGridDelegateWithMaxCrossAxisExtent(
-                                        maxCrossAxisExtent: maxCrossAxisExtent,
-                                        mainAxisSpacing: 15,
-                                        crossAxisSpacing: 15,
-                                        childAspectRatio: 1.15,
+                                return Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withOpacity(0.75),
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.pets_rounded,
+                                        size: 40,
+                                        color: Colors.black,
                                       ),
-                                  itemBuilder: (context, index) {
-                                    final item = cattleList[index];
 
-                                    return GestureDetector(
-                                      onTap: _openCattleTable,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Colors.green.withOpacity(0.70),
-                                          borderRadius: BorderRadius.circular(
-                                            16,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.white.withOpacity(
-                                              0.30,
-                                            ),
-                                          ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: Colors.black.withOpacity(
-                                                0.12,
-                                              ),
-                                              blurRadius: 10,
-                                              offset: const Offset(0, 6),
-                                            ),
-                                          ],
-                                        ),
-                                        padding: const EdgeInsets.all(12),
-                                        child: Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            if (item.urlImage != null &&
-                                                item.urlImage!.isNotEmpty)
-                                              ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                child: Image.network(
-                                                  item.urlImage!,
-                                                  height: 45,
-                                                  width: 70,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                              )
-                                            else
-                                              const Icon(
-                                                Icons.agriculture,
-                                                size: 38,
-                                                color: Color.fromARGB(
-                                                  255,
-                                                  0,
-                                                  0,
-                                                  0,
-                                                ),
-                                              ),
-                                            const SizedBox(height: 6),
-                                            Text(
-                                              item.name,
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 15,
-                                              ),
-                                            ),
-                                            Text(
-                                              "Raza: ${item.breed?.name ?? item.breedId}",
-                                              textAlign: TextAlign.center,
-                                            ),
-                                            Text("Código: ${item.code}"),
-                                            Text("Fecha: ${item.date}"),
+                                      const SizedBox(height: 6),
 
-                                            const SizedBox(height: 10),
-
-                                            Wrap(
-                                              spacing: 8,
-                                              runSpacing: 8,
-                                              alignment: WrapAlignment.center,
-                                              children: [
-                                                ElevatedButton.icon(
-                                                  onPressed: () {
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder:
-                                                            (
-                                                              _,
-                                                            ) => WeightTableViewByCattle(
-                                                              companyId:
-                                                                  widget
-                                                                      .company
-                                                                      .id!,
-                                                              cattleId:
-                                                                  item.id!,
-                                                              cattleName:
-                                                                  item.name,
-                                                            ),
-                                                      ),
-                                                    );
-                                                  },
-                                                  icon: const Icon(
-                                                    Icons.monitor_weight,
-                                                    size: 18,
-                                                  ),
-                                                  label: const Text("Peso"),
-                                                ),
-                                                ElevatedButton.icon(
-                                                  onPressed: () {
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder:
-                                                            (
-                                                              _,
-                                                            ) => VaccineTableViewByCattle(
-                                                              companyId:
-                                                                  widget
-                                                                      .company
-                                                                      .id!,
-                                                              cattleId:
-                                                                  item.id!,
-                                                              cattleName:
-                                                                  item.name,
-                                                            ),
-                                                      ),
-                                                    );
-                                                  },
-                                                  icon: const Icon(
-                                                    Icons.vaccines,
-                                                    size: 18,
-                                                  ),
-                                                  label: const Text("Vacuna"),
-                                                ),
-                                                ElevatedButton.icon(
-                                                  onPressed:
-                                                      () =>
-                                                          _openCheckupByCattle(
-                                                            item,
-                                                          ),
-                                                  icon: const Icon(
-                                                    Icons.health_and_safety,
-                                                    size: 18,
-                                                  ),
-                                                  label: const Text("Chequeo"),
-                                                ),
-                                                ElevatedButton.icon(
-                                                  onPressed: () {
-                                                    Navigator.push(
-                                                      context,
-                                                      MaterialPageRoute(
-                                                        builder:
-                                                            (
-                                                              _,
-                                                            ) => DiagnosisTableViewByCompany(
-                                                              companyName:
-                                                                  widget
-                                                                      .company
-                                                                      .companyName,
-                                                            ),
-                                                      ),
-                                                    );
-                                                  },
-                                                  icon: const Icon(
-                                                    Icons.medical_information,
-                                                    size: 18,
-                                                  ),
-                                                  label: const Text(
-                                                    "Diagnóstico",
-                                                  ),
-                                                ),
-                                                ElevatedButton.icon(
-                                                  onPressed:
-                                                      () =>
-                                                          _openCollectionByCattle(
-                                                            item,
-                                                          ),
-                                                  icon: const Icon(
-                                                    Icons.local_drink,
-                                                    size: 18,
-                                                  ),
-                                                  label: const Text(
-                                                    "Recolección",
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
+                                      Text(
+                                        item.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    );
-                                  },
+
+                                      Text("Raza: ${item.breed?.name ?? ""}"),
+                                      Text("Código: ${item.code}"),
+
+                                      const SizedBox(height: 10),
+
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: [
+                                          ElevatedButton.icon(
+                                            style: _chipStyle(),
+                                            icon: const Icon(
+                                              Icons.monitor_weight,
+                                            ),
+                                            label: const Text("Peso"),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder:
+                                                      (_) =>
+                                                          WeightTableViewByCattle(
+                                                            companyId:
+                                                                widget
+                                                                    .company
+                                                                    .id!,
+                                                            cattleId: item.id!,
+                                                            cattleName:
+                                                                item.name,
+                                                          ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+
+                                          ElevatedButton.icon(
+                                            style: _chipStyle(),
+                                            icon: const Icon(Icons.vaccines),
+                                            label: const Text("Vacuna"),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder:
+                                                      (_) =>
+                                                          VaccineTableViewByCattle(
+                                                            companyId:
+                                                                widget
+                                                                    .company
+                                                                    .id!,
+                                                            cattleId: item.id!,
+                                                            cattleName:
+                                                                item.name,
+                                                          ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+
+                                          ElevatedButton.icon(
+                                            style: _chipStyle(),
+                                            icon: const Icon(
+                                              Icons.health_and_safety,
+                                            ),
+                                            label: const Text("Chequeo"),
+                                            onPressed: () => _openCheckup(item),
+                                          ),
+
+                                          ElevatedButton.icon(
+                                            style: _chipStyle(),
+                                            icon: const Icon(Icons.local_drink),
+                                            label: const Text("Recolección"),
+                                            onPressed:
+                                                () => _openCollection(item),
+                                          ),
+
+                                          ElevatedButton.icon(
+                                            style: _chipStyle(),
+                                            icon: const Icon(
+                                              Icons.medical_information,
+                                            ),
+                                            label: const Text("Diagnóstico"),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder:
+                                                      (_) =>
+                                                          DiagnosisTableViewByCompany(
+                                                            companyName:
+                                                                widget
+                                                                    .company
+                                                                    .companyName,
+                                                          ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 );
                               },
                             ),

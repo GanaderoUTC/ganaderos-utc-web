@@ -14,10 +14,8 @@ class VaccineView extends StatefulWidget {
 }
 
 class _VaccineViewState extends State<VaccineView> {
-  // 🔹 Clave global para refrescar la tabla después de CRUD
   final GlobalKey<VaccineTableState> _tableKey = GlobalKey<VaccineTableState>();
 
-  /// 🔹 Abre el formulario modal para crear o editar una vacuna
   Future<void> _openVaccineForm({Vaccine? vaccine}) async {
     final result = await showDialog<bool>(
       context: context,
@@ -25,43 +23,84 @@ class _VaccineViewState extends State<VaccineView> {
       builder:
           (_) => VaccineForm(
             vaccine: vaccine,
-            onSave: () {
-              Navigator.pop(context, true);
-            },
+            onSave: () => Navigator.pop(context, true),
           ),
     );
 
     if (result == true) {
-      // Recarga la tabla al cerrar el formulario
       _tableKey.currentState?.loadVaccines();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final isMobile = w < 700;
+
+    final double padding = isMobile ? 12 : 18;
+    final double titleSize = isMobile ? 18 : 22;
+
     return Scaffold(
       appBar: const Navbar(),
       drawer: const Sidebar(),
       backgroundColor: const Color.fromARGB(155, 161, 207, 131),
+
+      // ✅ En móvil es MUY cómodo tener botón flotante
+      floatingActionButton:
+          isMobile
+              ? FloatingActionButton.extended(
+                onPressed: () => _openVaccineForm(),
+                icon: const Icon(Icons.add),
+                label: const Text("Agregar"),
+              )
+              : null,
+
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(padding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔹 Encabezado principal
-              const Text(
-                'Gestión de Vacunas',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50),
-                ),
+              // ✅ Header responsive: título + botón (solo desktop)
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Gestión de Vacunas',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: titleSize,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2C3E50),
+                      ),
+                    ),
+                  ),
+
+                  if (!isMobile) ...[
+                    const SizedBox(width: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => _openVaccineForm(),
+                      icon: const Icon(Icons.add),
+                      label: const Text("Agregar Vacuna"),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 12,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              // 🔹 Contenedor principal con la tabla
               Expanded(
                 child: Card(
                   elevation: 4,
@@ -69,10 +108,11 @@ class _VaccineViewState extends State<VaccineView> {
                     borderRadius: BorderRadius.circular(15),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+                    // ✅ padding más pequeño en móvil para aprovechar espacio
+                    padding: EdgeInsets.all(isMobile ? 10 : 16),
                     child: VaccineTable(
                       key: _tableKey,
-                      onEdit: (vaccine) => _openVaccineForm(vaccine: vaccine),
+                      onEdit: (v) => _openVaccineForm(vaccine: v),
                     ),
                   ),
                 ),

@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../widgets/footer.dart';
+
 import '../../widgets/navbar.dart';
 import '../../widgets/sidebar.dart';
 import '../../widgets/user_table.dart';
-import '../../models/user_models.dart';
-import '../user_view/user_form.dart';
 
 class UserView extends StatefulWidget {
   const UserView({super.key});
@@ -14,71 +12,83 @@ class UserView extends StatefulWidget {
 }
 
 class _UserViewState extends State<UserView> {
-  // 🔹 Clave global para refrescar la tabla después de CRUD
   final GlobalKey<UserTableState> _tableKey = GlobalKey<UserTableState>();
-
-  /// 🔹 Abre el formulario modal para crear o editar un usuario
-  Future<void> _openUserForm({User? user}) async {
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (_) => UserForm(
-            user: user,
-            onSave: () {
-              Navigator.pop(context, true);
-            },
-          ),
-    );
-
-    if (result == true) {
-      // Recarga la tabla al cerrar el formulario
-      _tableKey.currentState?.loadUsers();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final bool isMobile = w < 700;
+
     return Scaffold(
       appBar: const Navbar(),
       drawer: const Sidebar(),
       backgroundColor: const Color.fromARGB(155, 161, 207, 131),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(isMobile ? 12 : 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔹 Encabezado principal
-              const Text(
-                'Gestión de Usuarios',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50),
+              /// HEADER
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 12 : 16,
+                  vertical: isMobile ? 12 : 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.70),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.35)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.10),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.people, color: Color(0xFF2C3E50)),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Gestión de Usuarios',
+                      style: TextStyle(
+                        fontSize: isMobile ? 18 : 22,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2C3E50),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // 🔹 Contenedor principal con la tabla
+              const SizedBox(height: 14),
+
+              /// TABLA
               Expanded(
                 child: Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: UserTable(
-                      key: _tableKey,
-                      onEdit: (user) => _openUserForm(user: user),
-                    ),
+                    padding: EdgeInsets.all(isMobile ? 12 : 16),
+                    child: UserTable(key: _tableKey),
                   ),
                 ),
               ),
 
               const SizedBox(height: 10),
-              const Footer(),
+
+              /// FOOTER SIMPLE
+              const Center(
+                child: Text(
+                  "© 2025 UTC GEN APP - Todos los derechos reservados",
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ),
             ],
           ),
         ),

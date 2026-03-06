@@ -254,9 +254,7 @@ class CollectionTableState extends State<CollectionTable> {
                                             ),
                                             DataCell(
                                               Text(
-                                                collection.illness
-                                                        ?.toString() ??
-                                                    '0',
+                                                collection.illness.toString(),
                                               ),
                                             ),
                                             DataCell(

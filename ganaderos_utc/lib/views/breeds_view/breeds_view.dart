@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../widgets/footer.dart';
+
 import '../../widgets/navbar.dart';
 import '../../widgets/sidebar.dart';
 import '../../widgets/breeds_table.dart';
-import 'breed_form.dart';
 
 class BreedsView extends StatefulWidget {
   const BreedsView({super.key});
@@ -13,72 +12,83 @@ class BreedsView extends StatefulWidget {
 }
 
 class _BreedsViewState extends State<BreedsView> {
-  // Clave global para refrescar la tabla después de CRUD
   final GlobalKey<BreedsTableState> _tableKey = GlobalKey<BreedsTableState>();
-
-  // Abre el formulario modal para editar una raza existente
-  void _openBreedForm({dynamic breed}) async {
-    final result = await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder:
-          (_) => BreedForm(
-            breed: breed,
-            onSave: () {
-              Navigator.pop(context, true);
-            },
-          ),
-    );
-
-    if (result == true) {
-      // Recarga la tabla al cerrar el formulario
-      _tableKey.currentState?.loadBreeds();
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final isMobile = w < 700;
+
     return Scaffold(
       appBar: const Navbar(),
       drawer: const Sidebar(),
       backgroundColor: const Color.fromARGB(155, 161, 207, 131),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16.0),
+          padding: EdgeInsets.all(isMobile ? 12 : 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Título principal sin botón de agregar
-              const Text(
-                'Gestión de Razas',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50),
+              /// HEADER
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.symmetric(
+                  horizontal: isMobile ? 12 : 16,
+                  vertical: isMobile ? 12 : 14,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.70),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.35)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.10),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.pets, color: Color(0xFF2C3E50)),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Gestión de Razas',
+                      style: TextStyle(
+                        fontSize: isMobile ? 18 : 22,
+                        fontWeight: FontWeight.bold,
+                        color: const Color(0xFF2C3E50),
+                      ),
+                    ),
+                  ],
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 14),
 
-              // Contenedor principal con la tabla
+              /// TABLA
               Expanded(
                 child: Card(
-                  elevation: 3,
+                  elevation: 4,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: BreedsTable(
-                      key: _tableKey,
-                      onEdit: (breed) async => _openBreedForm(breed: breed),
-                    ),
+                    padding: EdgeInsets.all(isMobile ? 12 : 16),
+                    child: BreedsTable(key: _tableKey),
                   ),
                 ),
               ),
 
               const SizedBox(height: 10),
-              const Footer(),
+
+              /// FOOTER SIMPLE
+              const Center(
+                child: Text(
+                  "© 2025 UTC GEN APP - Todos los derechos reservados",
+                  style: TextStyle(fontSize: 12, color: Colors.black54),
+                ),
+              ),
             ],
           ),
         ),

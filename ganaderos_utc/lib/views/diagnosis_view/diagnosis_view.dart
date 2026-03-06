@@ -13,77 +13,109 @@ class DiagnosisView extends StatefulWidget {
 }
 
 class _DiagnosisViewState extends State<DiagnosisView> {
-  // 🔹 Clave global para refrescar la tabla después de CRUD
   final GlobalKey<DiagnosisTableState> _tableKey =
       GlobalKey<DiagnosisTableState>();
 
-  /// 🔹 Abre el formulario modal para editar o crear un diagnóstico
-  void _openDiagnosisForm({dynamic diagnosis}) async {
-    final result = await showDialog(
+  Future<void> _openDiagnosisForm({dynamic diagnosis}) async {
+    final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder:
           (_) => DiagnosisForm(
             diagnosis: diagnosis,
-            onSave: () {
-              Navigator.pop(context, true);
-            },
+            onSave: () => Navigator.pop(context, true),
           ),
     );
 
     if (result == true) {
-      // Recarga la tabla al cerrar el formulario
       _tableKey.currentState?.loadDiagnosis();
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final isMobile = width < 700;
+
     return Scaffold(
       appBar: const Navbar(),
       drawer: const Sidebar(),
       backgroundColor: const Color.fromARGB(155, 161, 207, 131),
+
+      // ✅ Botón flotante para crear (perfecto en móvil web)
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openDiagnosisForm(diagnosis: null),
+        icon: const Icon(Icons.add),
+        label: Text(isMobile ? 'Nuevo' : 'Agregar Diagnóstico'),
+        backgroundColor: Colors.green.shade700,
+        foregroundColor: Colors.white,
+      ),
+
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 🔹 Título principal sin botón de agregar
-              const Text(
-                'Gestión de Diagnósticos',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50),
-                ),
-              ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final pad = isMobile ? 10.0 : 16.0;
 
-              const SizedBox(height: 16),
-
-              // 🔹 Contenedor principal con la tabla
-              Expanded(
-                child: Card(
-                  elevation: 3,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+            return Padding(
+              padding: EdgeInsets.all(pad),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ✅ Header responsive (título + botón opcional en desktop)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Gestión de Diagnósticos',
+                          style: TextStyle(
+                            fontSize: isMobile ? 18 : 22,
+                            fontWeight: FontWeight.bold,
+                            color: const Color(0xFF2C3E50),
+                          ),
+                        ),
+                      ),
+                      if (!isMobile)
+                        ElevatedButton.icon(
+                          onPressed: () => _openDiagnosisForm(diagnosis: null),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Agregar'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: DiagnosisTable(
-                      key: _tableKey,
-                      onEdit:
-                          (diagnosis) async =>
-                              _openDiagnosisForm(diagnosis: diagnosis),
+
+                  SizedBox(height: isMobile ? 10 : 16),
+
+                  Expanded(
+                    child: Card(
+                      elevation: 3,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.all(isMobile ? 10 : 16),
+                        child: DiagnosisTable(
+                          key: _tableKey,
+                          onEdit:
+                              (diagnosis) async =>
+                                  _openDiagnosisForm(diagnosis: diagnosis),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ),
 
-              const SizedBox(height: 10),
-              const Footer(),
-            ],
-          ),
+                  const SizedBox(height: 10),
+                  const Footer(),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

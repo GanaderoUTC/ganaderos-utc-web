@@ -7,11 +7,18 @@ class UserRepository {
   static const String endpoint = "/users";
   static const String endpointLogin = "/users/auth";
 
-  //  LOGIN (username + password)
+  /// ⚠️ ESTA RUTA DEBE EXISTIR EN TU BACKEND
+  /// Si tu backend registra en otra ruta, cambia esto:
+  /// Ej: "/auth/register" o "/user/register" o "/users"
+  static const String endpointRegister = "/users/register";
+
+  // ---------------------------
+  // LOGIN (username + password)
+  // ---------------------------
   static Future<User?> login(String username, String password) async {
     try {
       final response = await ApiConnection.post(endpointLogin, {
-        "username": username,
+        "username": username.trim(),
         "password": password,
       });
 
@@ -20,16 +27,28 @@ class UserRepository {
         return null;
       }
 
-      if (!response.containsKey("id")) {
-        print("❌ Credenciales incorrectas");
+      // ✅ soporta {user:{...}} o {data:{...}} o {...}
+      Map<String, dynamic> userMap = {};
+      // ignore: unnecessary_type_check
+      if (response is Map) {
+        if (response['user'] is Map) {
+          userMap = Map<String, dynamic>.from(response['user']);
+        } else if (response['data'] is Map) {
+          userMap = Map<String, dynamic>.from(response['data']);
+        } else {
+          userMap = Map<String, dynamic>.from(response);
+        }
+      }
+
+      if (!userMap.containsKey("id")) {
+        print("❌ Credenciales incorrectas / respuesta sin id.");
         return null;
       }
 
-      final user = User.fromMap(response);
+      final user = User.fromMap(userMap);
 
-      // Guardar sesión
       await storageSave("isLoggedIn", "true");
-      await storageSave("user", jsonEncode(response));
+      await storageSave("user", jsonEncode(userMap));
 
       print("✅ Login exitoso");
       return user;
@@ -39,86 +58,142 @@ class UserRepository {
     }
   }
 
-  //  REGISTRO DE USUARIO
+  // ---------------------------
+  // REGISTRO (POST /users/register)
+  // ---------------------------
   static Future<Map<String, dynamic>> register(User user) async {
     try {
-      final payload = user.toMap(includePassword: true);
+      final payload = user.toApiMap(includePassword: true);
 
-      final response = await ApiConnection.post(endpoint, payload);
+      final response = await ApiConnection.register(payload);
 
       if (response == null) {
         return {"success": false, "message": "El servidor no respondió."};
       }
 
-      if (response.containsKey("error")) {
-        return {"success": false, "message": response["error"]};
+      if (response["error"] != null) {
+        return {"success": false, "message": response["error"].toString()};
       }
 
-      return {"success": true, "message": "Usuario registrado correctamente"};
+      return {"success": true, "message": response["message"] ?? "OK"};
     } catch (e) {
       return {"success": false, "message": "Error en registro: $e"};
     }
   }
 
-  //  LISTA DE USUARIOS
+  // ---------------------------
+  // LISTAR USUARIOS
+  // ---------------------------
   static Future<List<User>> getAll() async {
     try {
-      final List<dynamic> dataList = await ApiConnection.get(endpoint);
-      return dataList.map((data) => User.fromMap(data)).toList();
+      final dynamic response = await ApiConnection.get(endpoint);
+
+      // ✅ soporta List o {data:[...]}
+      List<dynamic> raw = [];
+      if (response is List) {
+        raw = response;
+      } else if (response is Map && response["data"] is List) {
+        raw = response["data"];
+      } else {
+        return [];
+      }
+
+      return raw
+          .map((e) => User.fromMap(Map<String, dynamic>.from(e)))
+          .toList();
     } catch (e) {
       print("❌ Error al obtener usuarios: $e");
       return [];
     }
   }
 
-  //  CREAR USUARIO
-  Future<User?> create(User user) async {
+  // ---------------------------
+  // CREAR USUARIO (ADMIN)  POST /users
+  // ---------------------------
+  Future<User?> create(User user, {bool includePassword = true}) async {
     try {
-      final response = await ApiConnection.post(
-        endpoint,
-        user.toMap(includePassword: true),
-      );
+      final payload = user.toApiMap(includePassword: includePassword);
+      final response = await ApiConnection.post(endpoint, payload);
+      if (response == null) return null;
 
-      if (response != null) {
-        return User.fromMap(response);
+      Map<String, dynamic> userMap = {};
+      // ignore: unnecessary_type_check
+      if (response is Map) {
+        if (response['data'] is Map) {
+          userMap = Map<String, dynamic>.from(response['data']);
+        } else if (response['user'] is Map) {
+          userMap = Map<String, dynamic>.from(response['user']);
+        } else {
+          userMap = Map<String, dynamic>.from(response);
+        }
       }
+
+      if (userMap.isEmpty) return null;
+      return User.fromMap(userMap);
     } catch (e) {
       print("❌ Error al crear usuario: $e");
+      return null;
     }
-    return null;
   }
 
-  //  ACTUALIZAR USUARIO
+  // ---------------------------
+  // ACTUALIZAR USUARIO (PATCH /users/:id)
+  // ---------------------------
   Future<bool> update(User user, {bool updatePassword = false}) async {
     if (user.id == null) return false;
 
     try {
-      final payload = user.toMap(includePassword: updatePassword);
+      final payload = user.toApiMap(includePassword: updatePassword);
 
-      final int result = await ApiConnection.patch(
+      final dynamic response = await ApiConnection.patch(
         "$endpoint/${user.id}",
         payload,
       );
 
-      return result > 0;
+      if (response is int) return response > 0;
+      if (response is bool) return response;
+
+      if (response is Map) {
+        if (response['success'] == true) return true;
+        if (response['ok'] == true) return true;
+        if (response.containsKey('id')) return true;
+        if (response['data'] is Map && (response['data'] as Map).isNotEmpty) {
+          return true;
+        }
+      }
+
+      return false;
     } catch (e) {
       print("❌ Error al actualizar usuario: $e");
       return false;
     }
   }
 
-  //  ELIMINAR USUARIO
+  // ---------------------------
+  // ELIMINAR USUARIO (DELETE /users/:id)
+  // ---------------------------
   Future<bool> delete(int id) async {
     try {
-      final int result = await ApiConnection.delete("$endpoint/$id");
-      return result > 0;
+      final dynamic response = await ApiConnection.delete("$endpoint/$id");
+
+      if (response is int) return response > 0;
+      if (response is bool) return response;
+
+      if (response is Map &&
+          (response['success'] == true || response['ok'] == true)) {
+        return true;
+      }
+
+      return false;
     } catch (e) {
       print("❌ Error al eliminar usuario: $e");
       return false;
     }
   }
 
-  //  SESIÓN
+  // ---------------------------
+  // SESIÓN
+  // ---------------------------
   static Future<bool> isLoggedIn() async {
     final val = await storageRead("isLoggedIn");
     return val == "true";
@@ -127,11 +202,24 @@ class UserRepository {
   static Future<User?> getUser() async {
     final data = await storageRead("user");
     if (data == null) return null;
-    return User.fromMap(jsonDecode(data));
+
+    final decoded = jsonDecode(data);
+    if (decoded is! Map) return null;
+
+    return User.fromMap(Map<String, dynamic>.from(decoded));
   }
 
   static Future<void> logout() async {
     await storageRemove("isLoggedIn");
     await storageRemove("user");
+  }
+
+  // ---------------------------
+  // EXTRA: validar "1 admin por empresa" (front)
+  // (NO reemplaza backend)
+  // ---------------------------
+  static Future<bool> companyHasAdmin(int companyId) async {
+    final users = await getAll();
+    return users.any((u) => u.companyId == companyId && u.role == 'admin');
   }
 }

@@ -1,14 +1,18 @@
+// ignore_for_file: file_names
 import 'package:flutter/material.dart';
+import 'package:ganaderos_utc/repository/user_company_repository.dart';
+
 import '../../models/user_models.dart';
 import '../../models/company_models.dart';
+
 import '../../repositories/user_repository.dart';
 import '../../repositories/company_repository.dart';
+import '../../utils/validators.dart';
 
 class UserForm extends StatefulWidget {
   final User? user;
 
-  /// Nota: ya no pedimos onSave aquí. El diálogo devolverá `true` si guardó OK.
-  const UserForm({super.key, this.user, required void Function() onSave});
+  const UserForm({super.key, this.user});
 
   @override
   State<UserForm> createState() => _UserFormState();
@@ -16,157 +20,174 @@ class UserForm extends StatefulWidget {
 
 class _UserFormState extends State<UserForm> {
   final _formKey = GlobalKey<FormState>();
+
   final UserRepository _repository = UserRepository();
 
-  // Controllers
-  final _nameController = TextEditingController();
-  final _lastNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _dniController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
+  final nameController = TextEditingController();
+  final lastNameController = TextEditingController();
+  final emailController = TextEditingController();
+  final dniController = TextEditingController();
+  final usernameController = TextEditingController();
+  final passwordController = TextEditingController();
 
-  List<Company> _companies = [];
-  Company? _selectedCompany;
-  String _selectedRole = "user";
-  bool _isLoading = true;
-  bool _isSaving = false; // para deshabilitar botón mientras guarda
+  List<Company> companies = [];
+  Company? selectedCompany;
+
+  String selectedRole = "user";
+
+  bool isLoading = true;
+  bool isSaving = false;
+
+  bool checkingAdmin = false;
+  bool companyHasAdmin = false;
 
   @override
   void initState() {
     super.initState();
-    _initForm();
+    _init();
   }
 
-  Future<void> _initForm() async {
-    // si vienen datos para editar, precargar
+  Future<void> _init() async {
     if (widget.user != null) {
-      _nameController.text = widget.user!.name;
-      _lastNameController.text = widget.user!.lastName;
-      _emailController.text = widget.user!.email ?? '';
-      _dniController.text = widget.user!.dni ?? '';
-      _usernameController.text = widget.user!.username ?? '';
-      _selectedRole = widget.user!.role ?? 'user';
-      _selectedCompany = widget.user!.company;
+      nameController.text = widget.user!.name;
+      lastNameController.text = widget.user!.lastName;
+      emailController.text = widget.user!.email ?? "";
+      dniController.text = widget.user!.dni ?? "";
+      usernameController.text = widget.user!.username ?? "";
+      selectedRole = widget.user!.role ?? "user";
     }
 
-    // cargar empresas (puede tardar)
     try {
       final repo = CompanyRepository();
-      final list = await repo.getAll();
+      final data = await repo.getAll();
 
-      if (!mounted) return;
+      companies = data;
 
-      _companies =
-          list.isNotEmpty
-              ? list
-              : [
-                Company(
-                  id: 0,
-                  companyCode: '',
-                  companyName: 'Sin empresa',
-                  responsible: '',
-                  dni: '',
-                  contact: '',
-                  email: '',
-                  address: '',
-                  surface: 0,
-                  fertilityPercentage: 0,
-                  birthRate: 0,
-                  mortalityRate: 0,
-                  weaningPercentage: 0,
-                  litersOfMilk: 0,
-                ),
-              ];
-
-      // si tenemos company del user, buscarla en la lista; si no existe seleccionar la primera
-      if (_selectedCompany != null) {
-        _selectedCompany = _companies.firstWhere(
-          (c) => c.id == _selectedCompany!.id,
-          orElse: () => _companies.first,
+      if (widget.user?.companyId != null) {
+        selectedCompany = companies.firstWhere(
+          (c) => c.id == widget.user!.companyId,
+          orElse: () => companies.first,
         );
-      } else {
-        _selectedCompany = _companies.first;
+      } else if (companies.isNotEmpty) {
+        selectedCompany = companies.first;
       }
 
-      setState(() => _isLoading = false);
+      await _checkAdmin();
+
+      setState(() => isLoading = false);
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
+      setState(() => isLoading = false);
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error cargando empresas: $e')));
+      ).showSnackBar(SnackBar(content: Text("Error cargando empresas: $e")));
     }
+  }
+
+  Future<void> _checkAdmin() async {
+    if (selectedCompany == null) return;
+
+    setState(() => checkingAdmin = true);
+
+    try {
+      final users = await UserCompanyRepository.getAllByCompany(
+        selectedCompany!.id!,
+      );
+
+      final admins = users.where((u) => (u.role ?? "user") == "admin");
+
+      bool hasAdmin = admins.isNotEmpty;
+
+      if (widget.user != null &&
+          widget.user!.role == "admin" &&
+          admins.length == 1 &&
+          admins.first.id == widget.user!.id) {
+        hasAdmin = false;
+      }
+
+      companyHasAdmin = hasAdmin;
+
+      if (companyHasAdmin && selectedRole == "admin") {
+        selectedRole = "user";
+      }
+    } catch (_) {}
+
+    setState(() => checkingAdmin = false);
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCompany == null) {
+
+    if (selectedCompany == null) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Seleccione una empresa')));
+      ).showSnackBar(const SnackBar(content: Text("Seleccione empresa")));
       return;
     }
 
-    setState(() => _isSaving = true);
+    if (selectedRole == "admin" && companyHasAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Esta empresa ya tiene administrador")),
+      );
+      return;
+    }
+
+    setState(() => isSaving = true);
 
     final user = User(
       id: widget.user?.id,
-      name: _nameController.text.trim(),
-      lastName: _lastNameController.text.trim(),
-      email: _emailController.text.trim(),
-      dni: _dniController.text.trim(),
-      role: _selectedRole,
-      username: _usernameController.text.trim(),
+      name: nameController.text.trim(),
+      lastName: lastNameController.text.trim(),
+      email: emailController.text.trim(),
+      dni: dniController.text.trim(),
+      role: selectedRole,
+      username: usernameController.text.trim(),
       password:
-          _passwordController.text.isNotEmpty
-              ? _passwordController.text.trim()
-              : null,
-      companyId: _selectedCompany!.id,
-      company: _selectedCompany,
+          passwordController.text.isEmpty
+              ? null
+              : passwordController.text.trim(),
+      companyId: selectedCompany!.id,
     );
 
     try {
       bool ok;
+
       if (widget.user == null) {
         final created = await _repository.create(user);
         ok = created != null;
       } else {
         ok = await _repository.update(
           user,
-          updatePassword: _passwordController.text.isNotEmpty,
+          updatePassword: passwordController.text.isNotEmpty,
         );
       }
 
-      if (!mounted) return;
-
-      setState(() => _isSaving = false);
+      setState(() => isSaving = false);
 
       if (ok) {
-        // cerramos el diálogo devolviendo true (padre detectará y refrescará)
-        Navigator.of(context).pop(true);
+        Navigator.pop(context, true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo guardar el usuario')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text("No se pudo guardar")));
       }
     } catch (e) {
-      if (!mounted) return;
-      setState(() => _isSaving = false);
+      setState(() => isSaving = false);
+
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
+      ).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _lastNameController.dispose();
-    _emailController.dispose();
-    _dniController.dispose();
-    _usernameController.dispose();
-    _passwordController.dispose();
+    nameController.dispose();
+    lastNameController.dispose();
+    emailController.dispose();
+    dniController.dispose();
+    usernameController.dispose();
+    passwordController.dispose();
     super.dispose();
   }
 
@@ -174,148 +195,210 @@ class _UserFormState extends State<UserForm> {
   Widget build(BuildContext context) {
     final isEditing = widget.user != null;
 
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      title: Text(isEditing ? 'Editar Usuario' : 'Agregar Usuario'),
-      content:
-          _isLoading
-              ? const SizedBox(
-                height: 150,
-                child: Center(child: CircularProgressIndicator()),
-              )
-              : SingleChildScrollView(
-                child: Form(
-                  key: _formKey,
-                  child: SizedBox(
-                    width: 500,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildTextField(
-                          _nameController,
-                          'Nombre',
-                          Icons.person,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildTextField(
-                          _lastNameController,
-                          'Apellido',
-                          Icons.person_outline,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildTextField(
-                          _emailController,
-                          'Email',
-                          Icons.email,
-                          validator: (v) {
-                            if (v == null || v.isEmpty) return 'Ingrese email';
-                            if (!v.contains('@')) return 'Email inválido';
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        _buildTextField(_dniController, 'DNI', Icons.badge),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          value: _selectedRole,
-                          decoration: const InputDecoration(
-                            labelText: 'Rol',
-                            prefixIcon: Icon(Icons.admin_panel_settings),
-                            border: OutlineInputBorder(),
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: 'admin',
-                              child: Text('Administrador'),
-                            ),
-                            DropdownMenuItem(
-                              value: 'user',
-                              child: Text('Usuario'),
-                            ),
-                          ],
-                          onChanged:
-                              (v) =>
-                                  setState(() => _selectedRole = v ?? 'user'),
-                          validator: (v) => v == null ? 'Seleccione rol' : null,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildTextField(
-                          _usernameController,
-                          'Username',
-                          Icons.account_circle,
-                        ),
-                        const SizedBox(height: 8),
-                        _buildTextField(
-                          _passwordController,
-                          isEditing ? 'Nueva contraseña' : 'Contraseña',
-                          Icons.lock,
-                          obscureText: true,
-                          validator: (v) {
-                            if (!isEditing && (v == null || v.isEmpty)) {
-                              return 'Ingrese contraseña';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<Company>(
-                          value: _selectedCompany,
-                          decoration: const InputDecoration(
-                            labelText: 'Empresa',
-                            prefixIcon: Icon(Icons.business),
-                            border: OutlineInputBorder(),
-                          ),
-                          items:
-                              _companies
-                                  .map(
-                                    (c) => DropdownMenuItem(
-                                      value: c,
-                                      child: Text(c.companyName),
-                                    ),
-                                  )
-                                  .toList(),
-                          onChanged:
-                              (v) => setState(() => _selectedCompany = v),
-                          validator:
-                              (v) => v == null ? 'Seleccione empresa' : null,
-                        ),
-                      ],
-                    ),
+    if (isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+
+          child: Form(
+            key: _formKey,
+
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  isEditing ? "Editar Usuario" : "Registrar Usuario",
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              ),
-      actions: [
-        TextButton(
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
-          child: const Text('Cancelar'),
+
+                const SizedBox(height: 18),
+
+                _input(
+                  nameController,
+                  "Nombre",
+                  Icons.person,
+                  validator: Validators.name,
+                ),
+
+                _input(
+                  lastNameController,
+                  "Apellido",
+                  Icons.person_outline,
+                  validator: Validators.name,
+                ),
+
+                _input(
+                  emailController,
+                  "Correo",
+                  Icons.email,
+                  validator: Validators.email,
+                ),
+
+                _input(
+                  dniController,
+                  "Cédula",
+                  Icons.badge,
+                  validator: Validators.cedulaEC,
+                ),
+
+                const SizedBox(height: 10),
+
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: const InputDecoration(
+                    labelText: "Rol",
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    DropdownMenuItem(
+                      value: "admin",
+                      enabled: !companyHasAdmin,
+                      child: Text(
+                        companyHasAdmin
+                            ? "Administrador (ocupado)"
+                            : "Administrador",
+                      ),
+                    ),
+
+                    const DropdownMenuItem(
+                      value: "user",
+                      child: Text("Usuario"),
+                    ),
+                  ],
+                  onChanged: (v) {
+                    if (v == "admin" && companyHasAdmin) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Esta empresa ya tiene administrador"),
+                        ),
+                      );
+                      return;
+                    }
+
+                    setState(() => selectedRole = v!);
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                DropdownButtonFormField<Company>(
+                  value: selectedCompany,
+                  decoration: const InputDecoration(
+                    labelText: "Empresa",
+                    border: OutlineInputBorder(),
+                  ),
+                  items:
+                      companies.map((c) {
+                        return DropdownMenuItem(
+                          value: c,
+                          child: Text(c.companyName),
+                        );
+                      }).toList(),
+                  onChanged: (v) async {
+                    selectedCompany = v;
+
+                    await _checkAdmin();
+
+                    setState(() {});
+                  },
+                ),
+
+                const SizedBox(height: 10),
+
+                _input(
+                  usernameController,
+                  "Usuario",
+                  Icons.account_circle,
+                  validator: Validators.username,
+                ),
+
+                _input(
+                  passwordController,
+                  isEditing ? "Nueva contraseña (opcional)" : "Contraseña",
+                  Icons.lock,
+                  obscure: true,
+                  validator: (v) {
+                    if (!isEditing) {
+                      return Validators.passwordStrong(v);
+                    }
+                    if (v == null || v.isEmpty) return null;
+                    return Validators.passwordStrong(v);
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () {
+                          Navigator.pop(context, false);
+                        },
+                        child: const Text("Cancelar"),
+                      ),
+                    ),
+
+                    const SizedBox(width: 10),
+
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: isSaving ? null : _save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade700,
+                        ),
+                        child:
+                            isSaving
+                                ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                                : Text(isEditing ? "Actualizar" : "Guardar"),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
-        ElevatedButton.icon(
-          onPressed: _isSaving ? null : _save,
-          icon: const Icon(Icons.save),
-          label: Text(isEditing ? 'Actualizar' : 'Guardar'),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildTextField(
+  Widget _input(
     TextEditingController controller,
     String label,
     IconData icon, {
-    bool obscureText = false,
+    bool obscure = false,
     String? Function(String?)? validator,
   }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscureText,
-      decoration: InputDecoration(
-        labelText: label,
-        prefixIcon: Icon(icon),
-        border: const OutlineInputBorder(),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        controller: controller,
+        obscureText: obscure,
+        validator: validator,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon),
+          border: const OutlineInputBorder(),
+        ),
       ),
-      validator:
-          validator ??
-          (v) => (v == null || v.isEmpty) ? 'Campo obligatorio' : null,
     );
   }
 }

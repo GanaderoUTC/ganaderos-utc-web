@@ -1,8 +1,14 @@
 // ignore_for_file: file_names
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:ganaderos_utc/repository/cattle_company_repository.dart';
 import '../../../models/cattle_models.dart';
 import '../../../widgets/footer.dart';
+
+// ✅ sesión
+import '../../../utils/storage.dart';
+import '../../../models/user_models.dart';
 
 class CattleTableByCompany extends StatefulWidget {
   final int companyId;
@@ -30,10 +36,45 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
   int currentPage = 1;
   final int rowsPerPage = 10;
 
+  // ✅ rol
+  bool _roleLoading = true;
+  bool _isAdmin = false;
+
   @override
   void initState() {
     super.initState();
+    _loadRole();
     _loadCattle();
+  }
+
+  Future<void> _loadRole() async {
+    try {
+      final raw = await storageRead("user");
+      if (raw == null) {
+        if (!mounted) return;
+        setState(() {
+          _isAdmin = false;
+          _roleLoading = false;
+        });
+        return;
+      }
+
+      final map = jsonDecode(raw);
+      final u = User.fromMap(Map<String, dynamic>.from(map));
+      final role = (u.role ?? 'user').toLowerCase();
+
+      if (!mounted) return;
+      setState(() {
+        _isAdmin = role == 'admin';
+        _roleLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isAdmin = false;
+        _roleLoading = false;
+      });
+    }
   }
 
   @override
@@ -68,6 +109,14 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
   }
 
   Future<void> _deleteCattle(int id) async {
+    // ✅ Solo admin elimina
+    if (_roleLoading || !_isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("No tiene permisos para eliminar.")),
+      );
+      return;
+    }
+
     if (id <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("ID inválido para eliminar.")),
@@ -105,18 +154,25 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
     );
 
     if (confirm == true) {
-      final success = await CattleCompanyRepository.deleteForCompany(id);
-      if (!mounted) return;
+      try {
+        final success = await CattleCompanyRepository.deleteForCompany(id);
+        if (!mounted) return;
 
-      if (success) {
-        await _loadCattle();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ganado eliminado correctamente')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo eliminar el registro')),
-        );
+        if (success) {
+          await _loadCattle();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ganado eliminado correctamente')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No se pudo eliminar el registro')),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
       }
     }
   }
@@ -179,6 +235,8 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
 
   @override
   Widget build(BuildContext context) {
+    final canDelete = !_roleLoading && _isAdmin;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Ganado por Empresa"),
@@ -207,7 +265,8 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
                           alignment: WrapAlignment.start,
                           children: [
                             ElevatedButton.icon(
-                              onPressed: widget.onAdd ?? () {},
+                              onPressed:
+                                  widget.onAdd, // ✅ si es null, se deshabilita
                               icon: const Icon(Icons.add),
                               label: const Text('Agregar Ganado'),
                               style: _topButtonStyle(Colors.green.shade700),
@@ -227,7 +286,6 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
                           ],
                         ),
                       ),
-
                       Expanded(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -254,16 +312,17 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
                                       child: _tableCard(
                                         DataTable(
                                           columnSpacing: 30,
-                                          headingRowColor:
-                                              WidgetStateProperty.all(
-                                                Colors.black.withOpacity(0.85),
-                                              ),
+                                          headingRowColor: WidgetStateProperty.all(
+                                            // ⚠️ si te falla: cambia WidgetStateProperty -> MaterialStateProperty
+                                            Colors.black.withOpacity(0.85),
+                                          ),
                                           headingTextStyle: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
                                           ),
                                           dataRowColor:
                                               WidgetStateProperty.resolveWith(
+                                                // ⚠️ si te falla: cambia WidgetStateProperty -> MaterialStateProperty
                                                 (states) =>
                                                     states.contains(
                                                           WidgetState.hovered,
@@ -352,16 +411,21 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
                                                                     ),
                                                           ),
                                                           IconButton(
-                                                            tooltip: "Eliminar",
+                                                            tooltip:
+                                                                canDelete
+                                                                    ? "Eliminar"
+                                                                    : "Solo administrador",
                                                             icon: const Icon(
                                                               Icons.delete,
                                                               color: Colors.red,
                                                             ),
                                                             onPressed:
-                                                                () =>
-                                                                    _deleteCattle(
-                                                                      id,
-                                                                    ),
+                                                                canDelete
+                                                                    ? () =>
+                                                                        _deleteCattle(
+                                                                          id,
+                                                                        )
+                                                                    : null,
                                                           ),
                                                         ],
                                                       ),
@@ -375,7 +439,6 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
                                   ),
                         ),
                       ),
-
                       if (totalPages > 1)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
@@ -413,7 +476,6 @@ class _CattleTableByCompanyState extends State<CattleTableByCompany> {
                             ),
                           ),
                         ),
-
                       const Footer(),
                     ],
                   ),

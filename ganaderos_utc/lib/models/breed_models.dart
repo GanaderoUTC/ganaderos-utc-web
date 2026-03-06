@@ -1,33 +1,63 @@
 class Breed {
-  int? id;
-  String name;
-  String description;
-  int sync;
+  final int? id;
+  final String name;
+  final String description;
 
-  Breed({
+  /// sync: 1 = sincronizado, 0 = no sincronizado
+  final int sync;
+
+  const Breed({
     this.id,
     required this.name,
     required this.description,
     required this.sync,
   });
 
-  // TRANSFORMA DE CLASE A MAPA
+  Breed copyWith({int? id, String? name, String? description, int? sync}) {
+    return Breed(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      sync: sync ?? this.sync,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {'id': id, 'name': name, 'description': description, 'sync': sync};
   }
 
-  // TRANSFORMA DE MAPA A CLASE
   factory Breed.fromMap(Map<String, dynamic> data) {
     return Breed(
-      id: data['id'],
-      name: data['name'] ?? '',
-      description: data['description'] ?? '',
-      sync: data['sync'] is bool ? (data['sync'] ? 1 : 0) : (data['sync'] ?? 0),
+      id: _asInt(data['id']),
+      name: (data['name'] ?? '').toString().trim(),
+      description: (data['description'] ?? '').toString().trim(),
+      sync: _asIntBool(data['sync']),
     );
   }
 
-  // Para valores default como “Desconocido”
   factory Breed.empty() {
-    return Breed(id: 0, name: "Desconocido", description: '', sync: 0);
+    return const Breed(id: 0, name: "Desconocido", description: '', sync: 0);
+  }
+
+  // ---------------- HELPERS ----------------
+
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    final s = v.toString().trim();
+    return int.tryParse(s);
+  }
+
+  /// Convierte true/false, 1/0, "1"/"0", "true"/"false" a int 1/0
+  static int _asIntBool(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v == 1 ? 1 : 0;
+    if (v is num) return v.toInt() == 1 ? 1 : 0;
+    if (v is bool) return v ? 1 : 0;
+
+    final s = v.toString().trim().toLowerCase();
+    if (s == '1' || s == 'true' || s == 'yes' || s == 'si') return 1;
+    return 0;
   }
 }

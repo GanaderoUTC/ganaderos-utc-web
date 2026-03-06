@@ -27,7 +27,6 @@ class _UserTableViewByCompanyState extends State<UserTableViewByCompany> {
   final ScrollController _horizontalController = ScrollController();
 
   int currentPage = 1;
-  final int rowsPerPage = 10;
 
   @override
   void initState() {
@@ -40,6 +39,12 @@ class _UserTableViewByCompanyState extends State<UserTableViewByCompany> {
     _verticalController.dispose();
     _horizontalController.dispose();
     super.dispose();
+  }
+
+  // ✅ rows por página responsive
+  int _rowsPerPage(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    return (w < 600) ? 5 : 10;
   }
 
   Future<void> _load() async {
@@ -149,7 +154,9 @@ class _UserTableViewByCompanyState extends State<UserTableViewByCompany> {
     }
   }
 
-  List<User> get paginatedData {
+  List<User> _paginatedData(BuildContext context) {
+    final rowsPerPage = _rowsPerPage(context);
+
     if (list.isEmpty) return [];
     final start = (currentPage - 1) * rowsPerPage;
     if (start >= list.length) return [];
@@ -157,14 +164,19 @@ class _UserTableViewByCompanyState extends State<UserTableViewByCompany> {
     return list.sublist(start, end > list.length ? list.length : end);
   }
 
-  int get totalPages => list.isEmpty ? 1 : (list.length / rowsPerPage).ceil();
+  int _totalPages(BuildContext context) {
+    final rowsPerPage = _rowsPerPage(context);
+    return list.isEmpty ? 1 : (list.length / rowsPerPage).ceil();
+  }
+
   void goToPage(int page) => setState(() => currentPage = page);
 
-  ButtonStyle _topButtonStyle(Color bg) {
+  ButtonStyle _topButtonStyle(Color bg, {bool fullWidth = false}) {
     return ElevatedButton.styleFrom(
       backgroundColor: bg,
       foregroundColor: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      minimumSize: fullWidth ? const Size.fromHeight(44) : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 2,
     );
@@ -191,6 +203,10 @@ class _UserTableViewByCompanyState extends State<UserTableViewByCompany> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final rows = _paginatedData(context);
+    final totalPages = _totalPages(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Usuarios - ${widget.companyName}"),
@@ -213,31 +229,74 @@ class _UserTableViewByCompanyState extends State<UserTableViewByCompany> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          alignment: WrapAlignment.start,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _onAdd,
-                              icon: const Icon(Icons.person_add),
-                              label: const Text('Agregar Usuario'),
-                              style: _topButtonStyle(Colors.green.shade700),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: _load,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Actualizar'),
-                              style: _topButtonStyle(Colors.green.shade500),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back),
-                              label: const Text('Regresar'),
-                              style: _topButtonStyle(Colors.teal.shade600),
-                            ),
-                          ],
-                        ),
+                        child:
+                            isMobile
+                                ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _onAdd,
+                                      icon: const Icon(Icons.person_add),
+                                      label: const Text('Agregar Usuario'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade700,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ElevatedButton.icon(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Actualizar'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade500,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ElevatedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.arrow_back),
+                                      label: const Text('Regresar'),
+                                      style: _topButtonStyle(
+                                        Colors.teal.shade600,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                                : Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  alignment: WrapAlignment.start,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _onAdd,
+                                      icon: const Icon(Icons.person_add),
+                                      label: const Text('Agregar Usuario'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade700,
+                                      ),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Actualizar'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade500,
+                                      ),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.arrow_back),
+                                      label: const Text('Regresar'),
+                                      style: _topButtonStyle(
+                                        Colors.teal.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                       ),
 
                       Expanded(
@@ -263,85 +322,118 @@ class _UserTableViewByCompanyState extends State<UserTableViewByCompany> {
                                     child: SingleChildScrollView(
                                       controller: _horizontalController,
                                       scrollDirection: Axis.horizontal,
-                                      child: _tableCard(
-                                        DataTable(
-                                          columnSpacing: 30,
-                                          headingRowColor:
-                                              WidgetStateProperty.all(
-                                                Colors.black.withOpacity(0.85),
+                                      child: ConstrainedBox(
+                                        // ✅ minWidth ayuda en web móvil
+                                        constraints: BoxConstraints(
+                                          minWidth: isMobile ? 760 : 980,
+                                        ),
+                                        child: _tableCard(
+                                          DataTable(
+                                            columnSpacing: isMobile ? 18 : 30,
+                                            headingRowColor:
+                                                WidgetStateProperty.all(
+                                                  Colors.black.withOpacity(
+                                                    0.85,
+                                                  ),
+                                                ),
+                                            headingTextStyle: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            dataRowColor:
+                                                WidgetStateProperty.resolveWith(
+                                                  (states) =>
+                                                      states.contains(
+                                                            WidgetState.hovered,
+                                                          )
+                                                          ? Colors.grey
+                                                              .withOpacity(0.15)
+                                                          : Colors.white
+                                                              .withOpacity(
+                                                                0.92,
+                                                              ),
+                                                ),
+                                            columns: const [
+                                              DataColumn(label: Text('ID')),
+                                              DataColumn(label: Text('Nombre')),
+                                              DataColumn(
+                                                label: Text('Apellido'),
                                               ),
-                                          headingTextStyle: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                              DataColumn(label: Text('Email')),
+                                              DataColumn(label: Text('DNI')),
+                                              DataColumn(
+                                                label: Text('Acciones'),
+                                              ),
+                                            ],
+                                            rows:
+                                                rows.map((u) {
+                                                  final id = u.id ?? 0;
+
+                                                  return DataRow(
+                                                    cells: [
+                                                      DataCell(
+                                                        Text(
+                                                          id > 0 ? '$id' : '-',
+                                                        ),
+                                                      ),
+                                                      DataCell(Text(u.name)),
+                                                      DataCell(
+                                                        Text(u.lastName),
+                                                      ),
+                                                      DataCell(
+                                                        SizedBox(
+                                                          width:
+                                                              isMobile
+                                                                  ? 180
+                                                                  : 260,
+                                                          child: Text(
+                                                            u.email ?? '-',
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            maxLines: 1,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        Text(u.dni ?? '-'),
+                                                      ),
+                                                      DataCell(
+                                                        Row(
+                                                          children: [
+                                                            IconButton(
+                                                              tooltip: "Editar",
+                                                              icon: const Icon(
+                                                                Icons.edit,
+                                                                color:
+                                                                    Colors.blue,
+                                                              ),
+                                                              onPressed:
+                                                                  () => _onEdit(
+                                                                    u,
+                                                                  ),
+                                                            ),
+                                                            IconButton(
+                                                              tooltip:
+                                                                  "Eliminar",
+                                                              icon: const Icon(
+                                                                Icons.delete,
+                                                                color:
+                                                                    Colors.red,
+                                                              ),
+                                                              onPressed:
+                                                                  () =>
+                                                                      _onDelete(
+                                                                        id,
+                                                                      ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                }).toList(),
                                           ),
-                                          dataRowColor:
-                                              WidgetStateProperty.resolveWith(
-                                                (states) =>
-                                                    states.contains(
-                                                          WidgetState.hovered,
-                                                        )
-                                                        ? Colors.grey
-                                                            .withOpacity(0.15)
-                                                        : Colors.white
-                                                            .withOpacity(0.92),
-                                              ),
-                                          columns: const [
-                                            DataColumn(label: Text('ID')),
-                                            DataColumn(label: Text('Nombre')),
-                                            DataColumn(label: Text('Apellido')),
-                                            DataColumn(label: Text('Email')),
-                                            DataColumn(label: Text('DNI')),
-                                            DataColumn(label: Text('Acciones')),
-                                          ],
-                                          rows:
-                                              paginatedData.map((u) {
-                                                final id = u.id ?? 0;
-                                                return DataRow(
-                                                  cells: [
-                                                    DataCell(
-                                                      Text(
-                                                        id > 0 ? '$id' : '-',
-                                                      ),
-                                                    ),
-                                                    DataCell(Text(u.name)),
-                                                    DataCell(Text(u.lastName)),
-                                                    DataCell(
-                                                      Text(u.email ?? '-'),
-                                                    ),
-                                                    DataCell(
-                                                      Text(u.dni ?? '-'),
-                                                    ),
-                                                    DataCell(
-                                                      Row(
-                                                        children: [
-                                                          IconButton(
-                                                            tooltip: "Editar",
-                                                            icon: const Icon(
-                                                              Icons.edit,
-                                                              color:
-                                                                  Colors.blue,
-                                                            ),
-                                                            onPressed:
-                                                                () =>
-                                                                    _onEdit(u),
-                                                          ),
-                                                          IconButton(
-                                                            tooltip: "Eliminar",
-                                                            icon: const Icon(
-                                                              Icons.delete,
-                                                              color: Colors.red,
-                                                            ),
-                                                            onPressed:
-                                                                () => _onDelete(
-                                                                  id,
-                                                                ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              }).toList(),
                                         ),
                                       ),
                                     ),

@@ -1,12 +1,18 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import '../models/cattle_models.dart';
 import '../repositories/cattle_repository.dart';
 import '../views/cattle_view/cattle_form.dart';
 import '../widgets/footer.dart';
 
+// ✅ sesión
+import '../utils/storage.dart';
+import '../models/user_models.dart';
+
 class CattleTable extends StatefulWidget {
   final List<Cattle> initialData;
-  final Future<void> Function(Cattle cattle) onEdit;
+  final Future<void> Function(Cattle cattle) onEdit; // ✅ se mantiene
 
   const CattleTable({
     super.key,
@@ -20,6 +26,7 @@ class CattleTable extends StatefulWidget {
 
 class _CattleTableState extends State<CattleTable> {
   final CattleRepository repository = CattleRepository();
+
   late List<Cattle> cattleList;
   bool isLoading = true;
 
@@ -29,11 +36,46 @@ class _CattleTableState extends State<CattleTable> {
   final ScrollController _verticalController = ScrollController();
   final ScrollController _horizontalController = ScrollController();
 
+  // ✅ rol
+  bool _roleLoading = true;
+  bool _isAdmin = false;
+
   @override
   void initState() {
     super.initState();
     cattleList = widget.initialData;
     isLoading = false;
+    _loadRole();
+  }
+
+  Future<void> _loadRole() async {
+    try {
+      final raw = await storageRead("user");
+      if (raw == null) {
+        if (!mounted) return;
+        setState(() {
+          _isAdmin = false;
+          _roleLoading = false;
+        });
+        return;
+      }
+
+      final map = jsonDecode(raw);
+      final u = User.fromMap(Map<String, dynamic>.from(map));
+      final role = (u.role ?? 'user').toLowerCase();
+
+      if (!mounted) return;
+      setState(() {
+        _isAdmin = role == 'admin';
+        _roleLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isAdmin = false;
+        _roleLoading = false;
+      });
+    }
   }
 
   @override
@@ -44,6 +86,7 @@ class _CattleTableState extends State<CattleTable> {
   }
 
   Future<void> _addCattle() async {
+    // ✅ ambos (admin/user) pueden agregar
     final newCattle = Cattle(
       companyId: 0,
       code: '',
@@ -81,6 +124,7 @@ class _CattleTableState extends State<CattleTable> {
   Future<void> _reloadData() async {
     if (!mounted) return;
     setState(() => isLoading = true);
+
     try {
       final data = await CattleRepository.getAll();
       if (!mounted) return;
@@ -99,10 +143,28 @@ class _CattleTableState extends State<CattleTable> {
   }
 
   Future<void> _deleteCattle(int id) async {
+    // ✅ solo admin elimina
+    if (!_isAdmin) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No tiene permisos para eliminar.')),
+      );
+      return;
+    }
+
+    if (id <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ID inválido para eliminar.')),
+      );
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder:
           (_) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
             title: const Text('Eliminar Ganado'),
             content: const Text('¿Seguro que deseas eliminar este ganado?'),
             actions: [
@@ -122,6 +184,7 @@ class _CattleTableState extends State<CattleTable> {
     if (confirm == true) {
       final success = await CattleRepository.delete(id);
       if (!mounted) return;
+
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Ganado eliminado correctamente')),
@@ -138,11 +201,12 @@ class _CattleTableState extends State<CattleTable> {
   List<Cattle> get paginatedData {
     if (cattleList.isEmpty) return [];
     final start = (currentPage - 1) * rowsPerPage;
-    final end =
-        (start + rowsPerPage) > cattleList.length
-            ? cattleList.length
-            : (start + rowsPerPage);
-    return cattleList.sublist(start, end);
+    if (start >= cattleList.length) return [];
+    final end = (start + rowsPerPage);
+    return cattleList.sublist(
+      start,
+      end > cattleList.length ? cattleList.length : end,
+    );
   }
 
   int get totalPages =>
@@ -164,8 +228,36 @@ class _CattleTableState extends State<CattleTable> {
     }
   }
 
+  List<int> _pagesWindow({
+    required int current,
+    required int total,
+    required int maxButtons,
+  }) {
+    if (total <= maxButtons) {
+      return List.generate(total, (i) => i + 1);
+    }
+    final half = maxButtons ~/ 2;
+    int start = current - half;
+    int end = current + half;
+
+    if (start < 1) {
+      start = 1;
+      end = maxButtons;
+    }
+    if (end > total) {
+      end = total;
+      start = total - maxButtons + 1;
+    }
+    return [for (int i = start; i <= end; i++) i];
+  }
+
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final bool isMobile = w < 700;
+
+    final canDelete = !_roleLoading && _isAdmin;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Ganado General'),
@@ -180,42 +272,121 @@ class _CattleTableState extends State<CattleTable> {
         ),
         child: Column(
           children: [
+            // ✅ acciones responsive
             Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: _addCattle,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Agregar Ganado'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 2, 129, 21),
-                      foregroundColor: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: _reloadData,
-                    icon: const Icon(Icons.update),
-                    label: const Text('Actualizar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(156, 14, 246, 2),
-                      foregroundColor: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text('Regresar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(255, 18, 228, 158),
-                      foregroundColor: Colors.black,
-                    ),
-                  ),
-                ],
-              ),
+              padding: EdgeInsets.all(isMobile ? 10 : 12),
+              child:
+                  isMobile
+                      ? Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton.icon(
+                              onPressed: _addCattle,
+                              icon: const Icon(Icons.add),
+                              label: const Text('Agregar Ganado'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromARGB(
+                                  255,
+                                  2,
+                                  129,
+                                  21,
+                                ),
+                                foregroundColor: Colors.black,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton.icon(
+                              onPressed: _reloadData,
+                              icon: const Icon(Icons.update),
+                              label: const Text('Actualizar'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromARGB(
+                                  156,
+                                  14,
+                                  246,
+                                  2,
+                                ),
+                                foregroundColor: Colors.black,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton.icon(
+                              onPressed: () => Navigator.pop(context),
+                              icon: const Icon(Icons.arrow_back),
+                              label: const Text('Regresar'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color.fromARGB(
+                                  255,
+                                  18,
+                                  228,
+                                  158,
+                                ),
+                                foregroundColor: Colors.black,
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                      : Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          ElevatedButton.icon(
+                            onPressed: _addCattle,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Agregar Ganado'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(
+                                255,
+                                2,
+                                129,
+                                21,
+                              ),
+                              foregroundColor: Colors.black,
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: _reloadData,
+                            icon: const Icon(Icons.update),
+                            label: const Text('Actualizar'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(
+                                156,
+                                14,
+                                246,
+                                2,
+                              ),
+                              foregroundColor: Colors.black,
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () => Navigator.pop(context),
+                            icon: const Icon(Icons.arrow_back),
+                            label: const Text('Regresar'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color.fromARGB(
+                                255,
+                                18,
+                                228,
+                                158,
+                              ),
+                              foregroundColor: Colors.black,
+                            ),
+                          ),
+                        ],
+                      ),
             ),
+
             Expanded(
               child:
                   isLoading
@@ -240,7 +411,7 @@ class _CattleTableState extends State<CattleTable> {
                               ],
                             ),
                             child: DataTable(
-                              columnSpacing: 40,
+                              columnSpacing: isMobile ? 18 : 40,
                               headingRowColor: WidgetStateProperty.all(
                                 Colors.black.withOpacity(0.85),
                               ),
@@ -248,80 +419,130 @@ class _CattleTableState extends State<CattleTable> {
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
                               ),
-                              dataRowColor:
-                                  WidgetStateProperty.resolveWith<Color?>((
-                                    states,
-                                  ) {
-                                    if (states.contains(WidgetState.hovered)) {
-                                      return Colors.grey.withOpacity(0.2);
-                                    }
-                                    return Colors.white.withOpacity(0.9);
-                                  }),
-                              columns: const [
-                                DataColumn(label: Text('ID')),
-                                DataColumn(label: Text('Código')),
-                                DataColumn(label: Text('Nombre')),
-                                DataColumn(label: Text('Registro')),
-                                DataColumn(label: Text('Categoría')),
-                                DataColumn(label: Text('Género')),
-                                DataColumn(label: Text('Origen')),
-                                DataColumn(label: Text('Raza')),
-                                DataColumn(label: Text('Fecha')),
-                                DataColumn(label: Text('Peso')),
-                                DataColumn(label: Text('Acciones')),
+                              dataRowMinHeight: isMobile ? 48 : 56,
+                              dataRowMaxHeight: isMobile ? 72 : 86,
+                              columns: [
+                                const DataColumn(label: Text('ID')),
+                                const DataColumn(label: Text('Código')),
+                                const DataColumn(label: Text('Nombre')),
+                                if (!isMobile)
+                                  const DataColumn(label: Text('Registro')),
+                                if (!isMobile)
+                                  const DataColumn(label: Text('Categoría')),
+                                const DataColumn(label: Text('Género')),
+                                if (!isMobile)
+                                  const DataColumn(label: Text('Origen')),
+                                if (!isMobile)
+                                  const DataColumn(label: Text('Raza')),
+                                if (!isMobile)
+                                  const DataColumn(label: Text('Fecha')),
+                                const DataColumn(label: Text('Peso')),
+                                const DataColumn(label: Text('Acciones')),
                               ],
                               rows:
                                   paginatedData.map((cattle) {
+                                    final id = cattle.id ?? 0;
+
                                     return DataRow(
                                       cells: [
-                                        DataCell(Text('${cattle.id ?? '-'}')),
+                                        DataCell(Text(id > 0 ? '$id' : '-')),
                                         DataCell(Text(cattle.code)),
-                                        DataCell(Text(cattle.name)),
-                                        DataCell(Text(cattle.register)),
                                         DataCell(
-                                          Text(cattle.category?.name ?? '-'),
+                                          SizedBox(
+                                            width: isMobile ? 180 : 220,
+                                            child: Text(
+                                              cattle.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
                                         ),
+                                        if (!isMobile)
+                                          DataCell(Text(cattle.register)),
+                                        if (!isMobile)
+                                          DataCell(
+                                            Text(cattle.category?.name ?? '-'),
+                                          ),
                                         DataCell(
                                           Text(_genderLabel(cattle.gender)),
                                         ),
-                                        DataCell(
-                                          Text(cattle.origin?.name ?? '-'),
-                                        ),
-                                        DataCell(
-                                          Text(cattle.breed?.name ?? '-'),
-                                        ),
-                                        DataCell(Text(cattle.date)),
+                                        if (!isMobile)
+                                          DataCell(
+                                            Text(cattle.origin?.name ?? '-'),
+                                          ),
+                                        if (!isMobile)
+                                          DataCell(
+                                            Text(cattle.breed?.name ?? '-'),
+                                          ),
+                                        if (!isMobile)
+                                          DataCell(Text(cattle.date)),
                                         DataCell(
                                           Text(
                                             cattle.weight.toStringAsFixed(2),
                                           ),
                                         ),
                                         DataCell(
-                                          Row(
-                                            children: [
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.edit,
-                                                  color: Colors.blue,
-                                                ),
-                                                onPressed: () async {
-                                                  if (!mounted) return;
-                                                  await widget.onEdit(cattle);
-                                                  await _reloadData();
+                                          isMobile
+                                              ? PopupMenuButton<String>(
+                                                tooltip: 'Acciones',
+                                                onSelected: (v) async {
+                                                  if (v == 'edit') {
+                                                    await widget.onEdit(cattle);
+                                                    await _reloadData();
+                                                  }
+                                                  if (v == 'delete') {
+                                                    if (canDelete) {
+                                                      await _deleteCattle(id);
+                                                    }
+                                                  }
                                                 },
-                                              ),
-                                              IconButton(
-                                                icon: const Icon(
-                                                  Icons.delete,
-                                                  color: Colors.red,
+                                                itemBuilder:
+                                                    (_) => [
+                                                      const PopupMenuItem(
+                                                        value: 'edit',
+                                                        child: Text('Editar'),
+                                                      ),
+                                                      PopupMenuItem(
+                                                        value: 'delete',
+                                                        enabled: canDelete,
+                                                        child: const Text(
+                                                          'Eliminar',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                child: const Icon(
+                                                  Icons.more_vert,
                                                 ),
-                                                onPressed:
-                                                    () => _deleteCattle(
-                                                      cattle.id ?? 0,
+                                              )
+                                              : Row(
+                                                children: [
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.edit,
+                                                      color: Colors.blue,
                                                     ),
+                                                    onPressed: () async {
+                                                      await widget.onEdit(
+                                                        cattle,
+                                                      );
+                                                      await _reloadData();
+                                                    },
+                                                  ),
+                                                  IconButton(
+                                                    icon: const Icon(
+                                                      Icons.delete,
+                                                      color: Colors.red,
+                                                    ),
+                                                    onPressed:
+                                                        canDelete
+                                                            ? () =>
+                                                                _deleteCattle(
+                                                                  id,
+                                                                )
+                                                            : null,
+                                                  ),
+                                                ],
                                               ),
-                                            ],
-                                          ),
                                         ),
                                       ],
                                     );
@@ -331,34 +552,60 @@ class _CattleTableState extends State<CattleTable> {
                         ),
                       ),
             ),
+
             if (totalPages > 1)
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(totalPages, (index) {
-                    final page = index + 1;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                      child: OutlinedButton(
-                        onPressed: () => goToPage(page),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor:
-                              page == currentPage
-                                  ? Colors.black87
-                                  : Colors.white70,
-                          foregroundColor:
-                              page == currentPage ? Colors.white : Colors.black,
-                        ),
-                        child: Text('$page'),
-                      ),
-                    );
-                  }),
-                ),
+              Padding(
+                padding: const EdgeInsets.only(top: 6, bottom: 6),
+                child: _buildPagination(isMobile),
               ),
+
             const Footer(),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPagination(bool isMobile) {
+    final pagesToShow = _pagesWindow(
+      current: currentPage,
+      total: totalPages,
+      maxButtons: isMobile ? 5 : 10,
+    );
+
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          OutlinedButton(
+            onPressed: currentPage > 1 ? () => goToPage(currentPage - 1) : null,
+            child: const Text('Anterior'),
+          ),
+          const SizedBox(width: 8),
+          ...pagesToShow.map((p) {
+            final selected = p == currentPage;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: OutlinedButton(
+                onPressed: () => goToPage(p),
+                style: OutlinedButton.styleFrom(
+                  backgroundColor: selected ? Colors.black87 : Colors.white70,
+                  foregroundColor: selected ? Colors.white : Colors.black,
+                ),
+                child: Text('$p'),
+              ),
+            );
+          }),
+          const SizedBox(width: 8),
+          OutlinedButton(
+            onPressed:
+                currentPage < totalPages
+                    ? () => goToPage(currentPage + 1)
+                    : null,
+            child: const Text('Siguiente'),
+          ),
+        ],
       ),
     );
   }

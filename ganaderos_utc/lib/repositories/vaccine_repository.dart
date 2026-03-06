@@ -2,13 +2,13 @@ import '../models/vaccine_models.dart';
 import '../settings/api_connections.dart';
 
 class VaccineRepository {
-  static const String endpoint = "/Vaccines?companyId=1";
+  static const String _basePath = "/vaccines";
 
-  // Obtener lista de vacunas desde la API
-  static Future<List<Vaccine>> getAll() async {
+  // Obtener lista de vacunas desde la API (por empresa)
+  static Future<List<Vaccine>> getAll({int companyId = 1}) async {
     try {
       final List<Map<String, dynamic>> dataList = await ApiConnection.get(
-        endpoint,
+        "$_basePath?companyId=$companyId",
       );
       return dataList.map((data) => Vaccine.fromMap(data)).toList();
     } catch (e) {
@@ -20,7 +20,7 @@ class VaccineRepository {
   // Crear un nuevo registro de vacuna
   Future<Vaccine?> create(Vaccine vaccine) async {
     try {
-      final response = await ApiConnection.post(endpoint, vaccine.toMap());
+      final response = await ApiConnection.post(_basePath, vaccine.toMap());
       if (response != null) {
         return Vaccine.fromMap(response);
       }
@@ -34,10 +34,10 @@ class VaccineRepository {
   Future<bool> update(Vaccine vaccine) async {
     if (vaccine.id == null) return false;
     try {
-      final int result = await ApiConnection.patch(
-        '/vaccines/${vaccine.id}',
+      final int result = (await ApiConnection.patch(
+        "$_basePath/${vaccine.id}",
         vaccine.toMap(),
-      );
+      ));
       return result > 0;
     } catch (e) {
       print("❌ Error al actualizar vacuna: $e");
@@ -48,7 +48,7 @@ class VaccineRepository {
   // Eliminar una vacuna por ID
   Future<bool> delete(int id) async {
     try {
-      final int result = await ApiConnection.delete('/vaccines/$id');
+      final int result = (await ApiConnection.delete("$_basePath/$id"));
       return result > 0;
     } catch (e) {
       print("❌ Error al eliminar vacuna: $e");

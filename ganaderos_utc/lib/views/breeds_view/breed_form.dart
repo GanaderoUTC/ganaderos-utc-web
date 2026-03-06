@@ -17,21 +17,19 @@ class _BreedFormState extends State<BreedForm> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  /// Ahora sync es INT en el modelo, pero el checkbox usa BOOL.
-  /// Lo manejamos internamente con bool.
+  /// sync int (1/0) en modelo, bool en UI
   bool _syncBool = false;
+
+  bool _saving = false;
 
   final _repository = BreedsRepository();
 
   @override
   void initState() {
     super.initState();
-
     if (widget.breed != null) {
       _nameController.text = widget.breed!.name;
       _descriptionController.text = widget.breed!.description;
-
-      // Convertir INT → BOOL (1 = true, 0 = false)
       _syncBool = widget.breed!.sync == 1;
     }
   }
@@ -43,48 +41,73 @@ class _BreedFormState extends State<BreedForm> {
     super.dispose();
   }
 
+  String? _validateName(String? value) {
+    if (value == null) return 'El nombre es obligatorio';
+    final s = value.trim();
+    if (s.isEmpty) return 'El nombre es obligatorio';
+    if (s.length < 2) return 'Nombre muy corto';
+    if (s.length > 60) return 'Nombre muy largo (máx. 60)';
+
+    final ok = RegExp(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 '._-]{2,60}$").hasMatch(s);
+    if (!ok) return 'Nombre inválido';
+    return null;
+  }
+
+  String? _validateDescription(String? value) {
+    if (value == null) return null;
+    final s = value.trim();
+    if (s.isEmpty) return null;
+    if (s.length > 250) return 'Descripción muy larga (máx. 250)';
+    return null;
+  }
+
   Future<void> _saveForm() async {
-    if (_formKey.currentState!.validate()) {
-      final newBreed = Breed(
-        id: widget.breed?.id,
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        // Convertimos BOOL → INT
-        sync: _syncBool ? 1 : 0,
+    if (_saving) return;
+
+    FocusScope.of(context).unfocus();
+
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _saving = true);
+
+    final newBreed = Breed(
+      id: widget.breed?.id,
+      name: _nameController.text.trim(),
+      description: _descriptionController.text.trim(),
+      sync: _syncBool ? 1 : 0,
+    );
+
+    try {
+      if (widget.breed == null) {
+        await _repository.insertBreed(newBreed);
+      } else {
+        await _repository.updateBreed(newBreed);
+      }
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            widget.breed == null
+                ? 'Raza registrada correctamente'
+                : 'Raza actualizada correctamente',
+          ),
+          backgroundColor: Colors.green,
+        ),
       );
 
-      try {
-        if (widget.breed == null) {
-          await _repository.insertBreed(newBreed);
-        } else {
-          await _repository.updateBreed(newBreed);
-        }
-
-        widget.onSave();
-
-        if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                widget.breed == null
-                    ? 'Raza registrada correctamente'
-                    : 'Raza actualizada correctamente',
-              ),
-              backgroundColor: Colors.green.shade700,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error al guardar: $e'),
-              backgroundColor: Colors.red.shade700,
-            ),
-          );
-        }
-      }
+      widget.onSave();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al guardar: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -92,7 +115,16 @@ class _BreedFormState extends State<BreedForm> {
   Widget build(BuildContext context) {
     final isEditing = widget.breed != null;
 
+    final size = MediaQuery.of(context).size;
+    final isMobile = size.width < 700;
+
+    final double dialogMaxWidth = isMobile ? size.width * 0.92 : 520;
+
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 24,
+        vertical: 16,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       title: Text(
         isEditing ? 'Editar Raza' : 'Agregar Nueva Raza',
@@ -101,62 +133,65 @@ class _BreedFormState extends State<BreedForm> {
           color: Color(0xFF2C3E50),
         ),
       ),
-      content: Form(
-        key: _formKey,
-        child: SizedBox(
-          width: 400,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Nombre de la raza',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.pets_outlined),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogMaxWidth,
+          maxHeight: size.height * 0.75,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Nombre de la raza',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.pets_outlined),
+                  ),
+                  validator: _validateName,
+                  textInputAction: TextInputAction.next,
                 ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'El nombre es obligatorio';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 15),
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.description_outlined),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripción',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.description_outlined),
+                  ),
+                  maxLines: 3,
+                  validator: _validateDescription,
                 ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 15),
-
-              /// CHECKBOX CON BOOL
-              CheckboxListTile(
-                title: const Text('Sincronizado'),
-                value: _syncBool,
-                onChanged: (value) {
-                  setState(() {
-                    _syncBool = value ?? false;
-                  });
-                },
-                activeColor: Colors.green.shade700,
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-            ],
+                const SizedBox(height: 8),
+                CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Sincronizado'),
+                  value: _syncBool,
+                  onChanged:
+                      _saving
+                          ? null
+                          : (value) {
+                            setState(() => _syncBool = value ?? false);
+                          },
+                  activeColor: Colors.green,
+                  controlAffinity: ListTileControlAffinity.leading,
+                ),
+              ],
+            ),
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _saving ? null : () => Navigator.pop(context, false),
           child: const Text('Cancelar', style: TextStyle(color: Colors.red)),
         ),
         ElevatedButton.icon(
-          onPressed: _saveForm,
+          onPressed: _saving ? null : _saveForm,
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green.shade700,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -164,7 +199,14 @@ class _BreedFormState extends State<BreedForm> {
               borderRadius: BorderRadius.circular(10),
             ),
           ),
-          icon: const Icon(Icons.save, color: Colors.white),
+          icon:
+              _saving
+                  ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                  : const Icon(Icons.save, color: Colors.white),
           label: Text(
             isEditing ? 'Actualizar' : 'Guardar',
             style: const TextStyle(color: Colors.white),

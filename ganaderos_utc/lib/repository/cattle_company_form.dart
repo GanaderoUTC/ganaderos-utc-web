@@ -9,6 +9,7 @@ import '../../repositories/categories_repository.dart';
 import '../../repositories/origin_repository.dart';
 import '../../repositories/breeds_repository.dart';
 import '../../repositories/company_repository.dart';
+import '../../utils/validators.dart';
 
 class CattleCompanyForm extends StatefulWidget {
   final Cattle? cattle;
@@ -80,19 +81,16 @@ class _CattleCompanyFormState extends State<CattleCompanyForm> {
 
     if (companies.isNotEmpty) {
       if (isEditing && widget.cattle != null) {
-        // Empresa del registro que estoy editando
         selectedCompany = companies.firstWhere(
           (x) => x.id == widget.cattle!.companyId,
           orElse: () => companies.first,
         );
       } else if (widget.initialCompanyId != null) {
-        // Empresa desde la que abrí el formulario (CompanyDashboard / tabla)
         selectedCompany = companies.firstWhere(
           (x) => x.id == widget.initialCompanyId,
           orElse: () => companies.first,
         );
       } else {
-        // Caso genérico: toma la primera
         selectedCompany = companies.first;
       }
     } else {
@@ -134,37 +132,56 @@ class _CattleCompanyFormState extends State<CattleCompanyForm> {
   }
 
   Future<void> _saveForm() async {
-    if (_formKey.currentState!.validate()) {
-      final newCattle = Cattle(
-        id: widget.cattle?.id,
-        code: _codeController.text.trim(),
-        name: _nameController.text.trim(),
-        register: _registerController.text.trim(),
-        categoryId: _selectedCategory?.id ?? 0,
-        gender: _selectedGender ?? 0,
-        originId: _selectedOrigin?.id ?? 0,
-        breedId: _selectedBreed?.id ?? 0,
-        date: _dateController.text.trim(),
-        weight: double.tryParse(_weightController.text.trim()) ?? 0.0,
-        urlImage: null,
-        companyId: _selectedCompany?.id ?? 0,
-        sync: _sync,
-      );
+    if (!_formKey.currentState!.validate()) return;
 
-      try {
-        if (isEditing) {
-          await CattleCompanyRepository.updateForCompany(newCattle);
-        } else {
-          await CattleCompanyRepository.createForCompany(newCattle);
-        }
-        if (!mounted) return;
-        widget.onSave();
-      } catch (_) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text("Error al guardar")));
+    // ✅ seguridad extra: empresa obligatoria al crear
+    if (!isEditing &&
+        (_selectedCompany?.id == null || _selectedCompany!.id == 0)) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Seleccione una empresa")));
+      return;
+    }
+
+    // ✅ peso válido (por si intentan "0" o algo raro)
+    final weightStr = _weightController.text.trim();
+    final weight = double.tryParse(weightStr);
+    if (weight == null || weight <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Ingrese un peso válido mayor a 0")),
+      );
+      return;
+    }
+
+    final newCattle = Cattle(
+      id: widget.cattle?.id,
+      code: _codeController.text.trim(),
+      name: _nameController.text.trim(),
+      register: _registerController.text.trim(),
+      categoryId: _selectedCategory?.id ?? 0,
+      gender: _selectedGender ?? 0,
+      originId: _selectedOrigin?.id ?? 0,
+      breedId: _selectedBreed?.id ?? 0,
+      date: _dateController.text.trim(),
+      weight: weight,
+      urlImage: null,
+      companyId: _selectedCompany?.id ?? (widget.cattle?.companyId ?? 0),
+      sync: _sync,
+    );
+
+    try {
+      if (isEditing) {
+        await CattleCompanyRepository.updateForCompany(newCattle);
+      } else {
+        await CattleCompanyRepository.createForCompany(newCattle);
       }
+      if (!mounted) return;
+      widget.onSave();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Error al guardar")));
     }
   }
 
@@ -180,10 +197,55 @@ class _CattleCompanyFormState extends State<CattleCompanyForm> {
             width: 500,
             child: Column(
               children: [
-                _field("Código", _codeController),
-                _field("Nombre", _nameController),
-                _field("Registro", _registerController),
-                _field("Peso (kg)", _weightController, numeric: true),
+                _field(
+                  "Código",
+                  _codeController,
+                  validator: (v) {
+                    final req = Validators.requiredField(v);
+                    if (req != null) return req;
+                    final s = v!.trim();
+                    // código ganado: letras/números/guion, 2-25
+                    if (!RegExp(r'^[A-Za-z0-9_-]{2,25}$').hasMatch(s)) {
+                      return "Código inválido (solo letras/números/-/_)";
+                    }
+                    return null;
+                  },
+                ),
+                _field(
+                  "Nombre",
+                  _nameController,
+                  validator: (v) => Validators.name(v, msg: "Nombre inválido"),
+                ),
+                _field(
+                  "Registro",
+                  _registerController,
+                  validator: (v) {
+                    final req = Validators.requiredField(v);
+                    if (req != null) return req;
+                    final s = v!.trim();
+                    // registro: letras/números/guiones/espacios, 2-40
+                    if (!RegExp(
+                      r'^[A-Za-z0-9ÁÉÍÓÚÜÑáéíóúüñ _-]{2,40}$',
+                    ).hasMatch(s)) {
+                      return "Registro inválido";
+                    }
+                    return null;
+                  },
+                ),
+                _field(
+                  "Peso (kg)",
+                  _weightController,
+                  numeric: true,
+                  validator: (v) {
+                    final req = Validators.requiredField(v);
+                    if (req != null) return req;
+                    final value = double.tryParse(v!.trim());
+                    if (value == null) return "Ingrese un número válido";
+                    if (value <= 0) return "El peso debe ser mayor a 0";
+                    if (value > 2000) return "Peso fuera de rango";
+                    return null;
+                  },
+                ),
                 _genderField(),
                 _dropdown<Category>(
                   "Categoría",
@@ -235,6 +297,7 @@ class _CattleCompanyFormState extends State<CattleCompanyForm> {
     String label,
     TextEditingController controller, {
     bool numeric = false,
+    String? Function(String?)? validator,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -248,7 +311,7 @@ class _CattleCompanyFormState extends State<CattleCompanyForm> {
           labelText: label,
           border: const OutlineInputBorder(),
         ),
-        validator: (v) => v == null || v.isEmpty ? "Campo requerido" : null,
+        validator: validator ?? (v) => Validators.requiredField(v),
       ),
     );
   }

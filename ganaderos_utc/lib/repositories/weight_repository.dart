@@ -2,13 +2,13 @@ import '../models/weight_models.dart';
 import '../settings/api_connections.dart';
 
 class WeightRepository {
-  static const String baseEndpoint = '/Weight';
+  static const String _basePath = '/weight'; // ✅ minúscula y consistente
 
   // Obtener todos los registros con companyId
   static Future<List<Weight>> getAll({int companyId = 1}) async {
     try {
       final List<Map<String, dynamic>> dataList = await ApiConnection.get(
-        '$baseEndpoint?companyId=$companyId',
+        '$_basePath?companyId=$companyId',
       );
 
       return dataList.map((data) => Weight.fromMap(data)).toList();
@@ -21,7 +21,7 @@ class WeightRepository {
   // Crear un nuevo registro
   Future<Weight?> create(Weight weight) async {
     try {
-      final response = await ApiConnection.post(baseEndpoint, weight.toMap());
+      final response = await ApiConnection.post(_basePath, weight.toMap());
 
       if (response != null) {
         return Weight.fromMap(response);
@@ -37,13 +37,12 @@ class WeightRepository {
     if (weight.id == null) return false;
 
     try {
-      final response = await ApiConnection.patch(
-        '$baseEndpoint/${weight.id}',
+      final int result = (await ApiConnection.patch(
+        '$_basePath/${weight.id}',
         weight.toMap(),
-      );
+      ));
 
-      // ignore: unnecessary_null_comparison
-      return response != null;
+      return result > 0; // ✅ correcto con tu ApiConnection
     } catch (e) {
       print("❌ Error al actualizar registro de peso: $e");
       return false;
@@ -53,10 +52,8 @@ class WeightRepository {
   // Eliminar un registro
   Future<bool> delete(int id) async {
     try {
-      final response = await ApiConnection.delete('$baseEndpoint/$id');
-
-      // ignore: unnecessary_null_comparison
-      return response != null;
+      final int result = (await ApiConnection.delete('$_basePath/$id'));
+      return result > 0; // ✅ correcto con tu ApiConnection
     } catch (e) {
       print("❌ Error al eliminar registro de peso: $e");
       return false;

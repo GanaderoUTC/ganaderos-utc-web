@@ -4,28 +4,37 @@ import 'origin_models.dart';
 import 'company_models.dart';
 
 class Cattle {
-  int? id;
-  String code;
-  String name;
-  String register;
-  int categoryId;
-  int gender;
-  int originId;
-  int breedId;
-  String? otherBreed;
-  String date;
-  double weight;
-  String? urlImage;
-  int companyId;
-  int sync;
+  final int? id;
+
+  final String code;
+  final String name;
+  final String register;
+
+  final int categoryId;
+  final int gender;
+  final int originId;
+  final int breedId;
+
+  final String? otherBreed;
+
+  /// Idealmente en formato YYYY-MM-DD
+  final String date;
+
+  final double weight;
+  final String? urlImage;
+
+  final int companyId;
+
+  /// sync: 1 = sincronizado, 0 = no sincronizado
+  final int sync;
 
   // Relaciones anidadas
-  Category? category;
-  Origin? origin;
-  Breed? breed;
-  Company? company;
+  final Category? category;
+  final Origin? origin;
+  final Breed? breed;
+  final Company? company;
 
-  Cattle({
+  const Cattle({
     this.id,
     required this.code,
     required this.name,
@@ -55,7 +64,6 @@ class Cattle {
   @override
   int get hashCode => id.hashCode;
 
-  /// Convierte a mapa para API
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -75,40 +83,45 @@ class Cattle {
     };
   }
 
-  /// Crea objeto desde JSON / Map
   factory Cattle.fromMap(Map<String, dynamic> data) {
-    return Cattle(
-      id: data['id'] ?? 0,
-      code: data['code'] ?? '',
-      name: data['name'] ?? '',
-      register: data['register'] ?? '',
-      categoryId: data['category_id'] ?? 0,
-      gender: data['gender'] ?? 0,
-      originId: data['origin_id'] ?? 0,
-      breedId: data['breed_id'] ?? 0,
-      otherBreed: data['other_breed'],
-      date: data['date'] ?? '',
-      weight:
-          (data['weight'] is int)
-              ? (data['weight'] as int).toDouble()
-              : (data['weight'] ?? 0.0),
-      urlImage: data['url_image'],
-      companyId: data['company_id'] ?? 0,
-      sync: data['sync'] is bool ? (data['sync'] ? 1 : 0) : (data['sync'] ?? 0),
+    final cat = data['category'];
+    final org = data['origin'];
+    final brd = data['breed'];
+    final cmp = data['company'];
 
-      // Relaciones anidadas
+    return Cattle(
+      id: _asInt(data['id']),
+      code: (data['code'] ?? '').toString().trim(),
+      name: (data['name'] ?? '').toString().trim(),
+      register: (data['register'] ?? '').toString().trim(),
+
+      categoryId: _asInt(data['category_id']) ?? 0,
+      gender: _asInt(data['gender']) ?? 0,
+      originId: _asInt(data['origin_id']) ?? 0,
+      breedId: _asInt(data['breed_id']) ?? 0,
+
+      otherBreed: data['other_breed']?.toString(),
+
+      date: (data['date'] ?? '').toString().trim(),
+      weight: _asDouble(data['weight']) ?? 0.0,
+
+      urlImage: data['url_image']?.toString(),
+      companyId: _asInt(data['company_id']) ?? 0,
+
+      sync: _asIntBool(data['sync']),
+
       category:
-          data['category'] != null ? Category.fromMap(data['category']) : null,
-      origin: data['origin'] != null ? Origin.fromMap(data['origin']) : null,
-      breed: data['breed'] != null ? Breed.fromMap(data['breed']) : null,
+          cat is Map ? Category.fromMap(Map<String, dynamic>.from(cat)) : null,
+      origin:
+          org is Map ? Origin.fromMap(Map<String, dynamic>.from(org)) : null,
+      breed: brd is Map ? Breed.fromMap(Map<String, dynamic>.from(brd)) : null,
       company:
-          data['company'] != null ? Company.fromMap(data['company']) : null,
+          cmp is Map ? Company.fromMap(Map<String, dynamic>.from(cmp)) : null,
     );
   }
 
-  /// Valor por defecto para dropdowns o formularios nuevos
   factory Cattle.empty() {
-    return Cattle(
+    return const Cattle(
       id: 0,
       code: "S/C",
       name: "Desconocido",
@@ -122,5 +135,36 @@ class Cattle {
       companyId: 0,
       sync: 0,
     );
+  }
+
+  // ---------------- HELPERS ----------------
+
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    final s = v.toString().trim();
+    return int.tryParse(s);
+  }
+
+  static double? _asDouble(dynamic v) {
+    if (v == null) return null;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is num) return v.toDouble();
+    final s = v.toString().trim().replaceAll(',', '.');
+    return double.tryParse(s);
+  }
+
+  /// Convierte true/false, 1/0, "1"/"0", "true"/"false" a int 1/0
+  static int _asIntBool(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v == 1 ? 1 : 0;
+    if (v is num) return v.toInt() == 1 ? 1 : 0;
+    if (v is bool) return v ? 1 : 0;
+
+    final s = v.toString().trim().toLowerCase();
+    if (s == '1' || s == 'true' || s == 'yes' || s == 'si') return 1;
+    return 0;
   }
 }

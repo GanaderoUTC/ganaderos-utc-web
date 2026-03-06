@@ -4,14 +4,13 @@ class Diagnosis {
   final String description;
   final bool sync;
 
-  Diagnosis({
+  const Diagnosis({
     this.id,
     required this.name,
     required this.description,
     required this.sync,
   });
 
-  // Convertir objeto a mapa para SQLite
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -21,17 +20,15 @@ class Diagnosis {
     };
   }
 
-  // Convertir datos del mapa a un objeto Diagnosis
   factory Diagnosis.fromMap(Map<String, dynamic> map) {
     return Diagnosis(
-      id: map['id'] is int ? map['id'] : int.tryParse('${map['id']}'),
-      name: map['name'] ?? '',
-      description: map['description'] ?? '',
-      sync: map['sync'] == 1 || map['sync'] == true,
+      id: _asInt(map['id']),
+      name: _asString(map['name']),
+      description: _asString(map['description']),
+      sync: _asBool(map['sync']),
     );
   }
 
-  // Para copiar el objeto modificando solo lo necesario
   Diagnosis copyWith({int? id, String? name, String? description, bool? sync}) {
     return Diagnosis(
       id: id ?? this.id,
@@ -41,8 +38,39 @@ class Diagnosis {
     );
   }
 
+  factory Diagnosis.empty() {
+    return const Diagnosis(
+      id: 0,
+      name: 'Desconocido',
+      description: '',
+      sync: false,
+    );
+  }
+
   @override
   String toString() {
     return 'Diagnosis(id: $id, name: $name, description: $description, sync: $sync)';
+  }
+
+  // ---------------- HELPERS ----------------
+
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString().trim());
+  }
+
+  static String _asString(dynamic v) {
+    if (v == null) return '';
+    return v.toString().trim();
+  }
+
+  static bool _asBool(dynamic v) {
+    if (v == null) return false;
+    if (v is bool) return v;
+    if (v is num) return v != 0;
+    final s = v.toString().trim().toLowerCase();
+    return s == '1' || s == 'true' || s == 'yes' || s == 'si';
   }
 }

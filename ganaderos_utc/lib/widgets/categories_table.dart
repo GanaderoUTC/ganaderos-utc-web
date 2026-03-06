@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
+
 import '../models/categories_models.dart';
 import '../repositories/categories_repository.dart';
 import '../views/categories_view/category_form.dart';
 
 class CategoriesTable extends StatefulWidget {
-  final Function()? onReload;
+  final VoidCallback? onReload;
 
-  const CategoriesTable({
-    super.key,
-    this.onReload,
-    required Future<void> Function(dynamic category) onEdit,
-  });
+  const CategoriesTable({super.key, this.onReload});
 
   @override
   CategoriesTableState createState() => CategoriesTableState();
@@ -31,83 +28,123 @@ class CategoriesTableState extends State<CategoriesTable> {
     loadCategories();
   }
 
-  /// 🔹 Cargar todas las categorías
+  void showMessage(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> loadCategories() async {
+    if (!mounted) return;
+
     setState(() => isLoading = true);
+
     try {
       final data = await CategoriesRepository.getAll();
+
+      if (!mounted) return;
+
       setState(() {
         categories = data;
         isLoading = false;
-        currentPage = 1;
+
+        final maxPages =
+            categories.isEmpty ? 1 : (categories.length / rowsPerPage).ceil();
+
+        if (currentPage > maxPages) currentPage = maxPages;
+        if (currentPage < 1) currentPage = 1;
       });
+
+      widget.onReload?.call();
     } catch (e) {
+      if (!mounted) return;
+
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al cargar categorías: $e')));
+
+      showMessage("Error al cargar categorías: $e");
     }
   }
 
-  /// 🔹 Crear nueva categoría
+  /// 🔹 Agregar categoría (igual que OriginTable)
   void _addCategory() {
-    showDialog(
+    showDialog<bool>(
       context: context,
-      builder: (_) => CategoryForm(onSave: () => loadCategories()),
-    );
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return CategoryForm(onSave: () => Navigator.pop(dialogContext, true));
+      },
+    ).then((ok) async {
+      if (ok == true) await loadCategories();
+    });
   }
 
   /// 🔹 Editar categoría
   void _editCategory(Category category) {
-    showDialog(
+    showDialog<bool>(
       context: context,
-      builder:
-          (_) =>
-              CategoryForm(category: category, onSave: () => loadCategories()),
-    );
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return CategoryForm(
+          category: category,
+          onSave: () => Navigator.pop(dialogContext, true),
+        );
+      },
+    ).then((ok) async {
+      if (ok == true) await loadCategories();
+    });
   }
 
-  /// 🔹 Eliminar categoría con confirmación
+  /// 🔹 Eliminar categoría
   Future<void> _deleteCategory(int id) async {
+    if (id <= 0) {
+      showMessage("ID inválido");
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder:
           (_) => AlertDialog(
-            title: const Text('Eliminar Categoría'),
-            content: const Text('¿Seguro que deseas eliminar esta categoría?'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            title: const Text("Eliminar categoría"),
+            content: const Text("¿Seguro que desea eliminar esta categoría?"),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancelar'),
+                child: const Text("Cancelar"),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text('Eliminar'),
+                child: const Text("Eliminar"),
               ),
             ],
           ),
     );
 
     if (confirm == true) {
-      final success = await repository.delete(id);
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Categoría eliminada correctamente')),
-        );
+      final ok = await repository.delete(id);
+
+      if (!mounted) return;
+
+      if (ok) {
+        showMessage("Categoría eliminada");
         await loadCategories();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo eliminar la categoría')),
-        );
+        showMessage("No se pudo eliminar");
       }
     }
   }
 
-  /// 🔹 Datos paginados
   List<Category> get paginatedData {
+    if (categories.isEmpty) return [];
+
     final start = (currentPage - 1) * rowsPerPage;
-    final end = (start + rowsPerPage);
+
+    if (start >= categories.length) return [];
+
+    final end = start + rowsPerPage;
+
     return categories.sublist(
       start,
       end > categories.length ? categories.length : end,
@@ -115,12 +152,21 @@ class CategoriesTableState extends State<CategoriesTable> {
   }
 
   int get totalPages =>
-      (categories.isEmpty) ? 1 : (categories.length / rowsPerPage).ceil();
+      categories.isEmpty ? 1 : (categories.length / rowsPerPage).ceil();
 
-  void goToPage(int page) => setState(() => currentPage = page);
+  void goToPage(int page) {
+    if (!mounted) return;
+
+    if (page < 1 || page > totalPages) return;
+
+    setState(() => currentPage = page);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    final bool isMobile = w < 700;
+
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -129,8 +175,7 @@ class CategoriesTableState extends State<CategoriesTable> {
       builder: (_, constraints) {
         return Container(
           width: constraints.maxWidth,
-          height: constraints.maxHeight,
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isMobile ? 12 : 16),
           decoration: const BoxDecoration(
             image: DecorationImage(
               image: AssetImage('assets/images/fondo1.jpg'),
@@ -140,27 +185,24 @@ class CategoriesTableState extends State<CategoriesTable> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              /// 🔹 Barra de acciones superior
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              /// Barra acciones (igual estilo)
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.spaceBetween,
                 children: [
                   ElevatedButton.icon(
                     icon: const Icon(Icons.add),
-                    label: const Text('Agregar Categoría'),
+                    label: const Text("Agregar Categoría"),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color.fromARGB(
-                        255,
-                        96,
-                        227,
-                        2,
-                      ), // Verde
+                      backgroundColor: const Color.fromARGB(255, 96, 227, 2),
                       foregroundColor: Colors.black87,
                     ),
                     onPressed: _addCategory,
                   ),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.refresh),
-                    label: const Text('Recargar'),
+                    label: const Text("Recargar"),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color.fromARGB(136, 110, 223, 5),
                       foregroundColor: Colors.black87,
@@ -170,15 +212,15 @@ class CategoriesTableState extends State<CategoriesTable> {
                 ],
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
-              /// 🔹 Tabla principal
+              /// TABLA
               Expanded(
                 child:
                     categories.isEmpty
                         ? const Center(
                           child: Text(
-                            'No hay categorías registradas.',
+                            "No hay categorías registradas.",
                             style: TextStyle(
                               fontSize: 16,
                               color: Colors.black54,
@@ -196,7 +238,7 @@ class CategoriesTableState extends State<CategoriesTable> {
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.88),
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
                                       color: Colors.black.withOpacity(0.2),
@@ -206,7 +248,7 @@ class CategoriesTableState extends State<CategoriesTable> {
                                   ],
                                 ),
                                 child: DataTable(
-                                  columnSpacing: 40,
+                                  columnSpacing: isMobile ? 18 : 40,
                                   headingRowColor: WidgetStateProperty.all(
                                     Colors.black.withOpacity(0.85),
                                   ),
@@ -214,61 +256,97 @@ class CategoriesTableState extends State<CategoriesTable> {
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                   ),
-                                  dataRowColor: WidgetStateProperty.resolveWith<
-                                    Color?
-                                  >((Set<WidgetState> states) {
-                                    if (states.contains(WidgetState.selected)) {
-                                      return Colors.grey.withOpacity(0.3);
-                                    }
-                                    return Colors.white.withOpacity(0.9);
-                                  }),
                                   columns: const [
-                                    DataColumn(label: Text('ID')),
-                                    DataColumn(label: Text('Nombre')),
-                                    DataColumn(label: Text('Descripción')),
-                                    DataColumn(label: Text('Acciones')),
+                                    DataColumn(label: Text("ID")),
+                                    DataColumn(label: Text("Nombre")),
+                                    DataColumn(label: Text("Descripción")),
+                                    DataColumn(label: Text("Acciones")),
                                   ],
                                   rows:
                                       paginatedData.map((category) {
+                                        final id = category.id ?? 0;
+
                                         return DataRow(
                                           cells: [
                                             DataCell(
-                                              Text(
-                                                category.id?.toString() ?? '-',
-                                              ),
-                                            ),
-                                            DataCell(Text(category.name)),
-                                            DataCell(
-                                              Text(category.description),
+                                              Text(id > 0 ? "$id" : "-"),
                                             ),
                                             DataCell(
-                                              Row(
-                                                children: [
-                                                  IconButton(
-                                                    icon: const Icon(
-                                                      Icons.edit,
-                                                      color: Colors.blue,
-                                                    ),
-                                                    tooltip: 'Editar categoría',
-                                                    onPressed:
-                                                        () => _editCategory(
-                                                          category,
-                                                        ),
-                                                  ),
-                                                  IconButton(
-                                                    icon: const Icon(
-                                                      Icons.delete,
-                                                      color: Colors.red,
-                                                    ),
-                                                    tooltip:
-                                                        'Eliminar categoría',
-                                                    onPressed:
-                                                        () => _deleteCategory(
-                                                          category.id ?? 0,
-                                                        ),
-                                                  ),
-                                                ],
+                                              SizedBox(
+                                                width: isMobile ? 200 : 240,
+                                                child: Text(
+                                                  category.name,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
                                               ),
+                                            ),
+                                            DataCell(
+                                              SizedBox(
+                                                width: isMobile ? 220 : 420,
+                                                child: Text(
+                                                  category.description,
+                                                  maxLines: isMobile ? 2 : 3,
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                            DataCell(
+                                              isMobile
+                                                  ? PopupMenuButton<String>(
+                                                    onSelected: (v) {
+                                                      if (v == "edit") {
+                                                        _editCategory(category);
+                                                      }
+                                                      if (v == "delete") {
+                                                        _deleteCategory(id);
+                                                      }
+                                                    },
+                                                    itemBuilder:
+                                                        (_) => const [
+                                                          PopupMenuItem(
+                                                            value: "edit",
+                                                            child: Text(
+                                                              "Editar",
+                                                            ),
+                                                          ),
+                                                          PopupMenuItem(
+                                                            value: "delete",
+                                                            child: Text(
+                                                              "Eliminar",
+                                                            ),
+                                                          ),
+                                                        ],
+                                                    child: const Icon(
+                                                      Icons.more_vert,
+                                                    ),
+                                                  )
+                                                  : Row(
+                                                    children: [
+                                                      IconButton(
+                                                        icon: const Icon(
+                                                          Icons.edit,
+                                                          color: Colors.blue,
+                                                        ),
+                                                        onPressed:
+                                                            () => _editCategory(
+                                                              category,
+                                                            ),
+                                                      ),
+                                                      IconButton(
+                                                        icon: const Icon(
+                                                          Icons.delete,
+                                                          color: Colors.red,
+                                                        ),
+                                                        onPressed:
+                                                            () =>
+                                                                _deleteCategory(
+                                                                  id,
+                                                                ),
+                                                      ),
+                                                    ],
+                                                  ),
                                             ),
                                           ],
                                         );
@@ -280,8 +358,8 @@ class CategoriesTableState extends State<CategoriesTable> {
                         ),
               ),
 
-              const SizedBox(height: 12),
-              _buildPagination(),
+              const SizedBox(height: 10),
+              _buildPagination(isMobile),
             ],
           ),
         );
@@ -289,53 +367,25 @@ class CategoriesTableState extends State<CategoriesTable> {
     );
   }
 
-  /// 🔹 Paginación inferior
-  Widget _buildPagination() {
+  Widget _buildPagination(bool isMobile) {
     if (totalPages <= 1) return const SizedBox.shrink();
 
-    List<Widget> pageButtons = [];
-
-    for (int i = 1; i <= totalPages; i++) {
-      pageButtons.add(
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: OutlinedButton(
-            style: OutlinedButton.styleFrom(
-              backgroundColor:
-                  i == currentPage
-                      ? Colors.black87
-                      : Colors.white.withOpacity(0.7),
-              foregroundColor: i == currentPage ? Colors.white : Colors.black,
-              side: const BorderSide(color: Colors.black54),
-            ),
-            onPressed: () => goToPage(i),
-            child: Text('$i'),
-          ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        OutlinedButton(
+          onPressed: currentPage > 1 ? () => goToPage(currentPage - 1) : null,
+          child: const Text("Anterior"),
         ),
-      );
-    }
-
-    pageButtons.add(
-      Padding(
-        padding: const EdgeInsets.only(left: 8),
-        child: OutlinedButton(
+        const SizedBox(width: 10),
+        Text("Página $currentPage / $totalPages"),
+        const SizedBox(width: 10),
+        OutlinedButton(
           onPressed:
               currentPage < totalPages ? () => goToPage(currentPage + 1) : null,
-          style: OutlinedButton.styleFrom(
-            backgroundColor: Colors.white.withOpacity(0.7),
-            foregroundColor: Colors.black,
-          ),
-          child: const Text('Siguiente'),
+          child: const Text("Siguiente"),
         ),
-      ),
-    );
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: pageButtons,
-      ),
+      ],
     );
   }
 }

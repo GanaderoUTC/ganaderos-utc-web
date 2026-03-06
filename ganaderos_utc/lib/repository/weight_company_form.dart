@@ -7,7 +7,6 @@ import '../../../models/company_models.dart';
 
 import '../../../repositories/company_repository.dart';
 import '../../../repository/cattle_company_repository.dart';
-
 import '../../../repository/weight_company_repository.dart';
 
 class WeightCompanyForm extends StatefulWidget {
@@ -53,30 +52,66 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
     if (_isEditing) {
       _dateController.text = widget.weight!.date;
       _weightController.text = widget.weight!.weight.toString();
-      _observationController.text = widget.weight!.observation;
+
+      // observation en tu modelo es String (no nullable), pero igual proteges "null"
+      final obs = widget.weight!.observation.toString();
+      _observationController.text = (obs == 'null') ? '' : obs;
+    } else {
+      // ✅ opcional: fecha por defecto hoy (mejora UX)
+      _dateController.text = DateTime.now().toIso8601String().split('T').first;
     }
   }
 
   Future<void> _init() async {
+    if (!mounted) return;
     setState(() => _loading = true);
 
     try {
-      //  1) Cargar empresa
+      // ✅ 1) Cargar empresa (sin crash)
       final companies = await CompanyRepository().getAll();
-      final company = companies.firstWhere((c) => c.id == widget.companyId);
+      Company? company;
+      for (final c in companies) {
+        if (c.id == widget.companyId) {
+          company = c;
+          break;
+        }
+      }
 
-      //  2) Cargar ganado solo de esa empresa
+      // ✅ 2) Cargar ganado solo de esa empresa (sin crash)
       final cattleList = await CattleCompanyRepository.getAllByCompany(
         widget.companyId,
       );
-      final cattle = cattleList.firstWhere((c) => c.id == widget.cattleId);
+
+      Cattle? cattle;
+      for (final c in cattleList) {
+        if (c.id == widget.cattleId) {
+          cattle = c;
+          break;
+        }
+      }
 
       if (!mounted) return;
+
       setState(() {
         _company = company;
         _cattle = cattle;
         _loading = false;
       });
+
+      if (company == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No se encontró la empresa del formulario"),
+          ),
+        );
+      }
+      if (cattle == null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("No se encontró el ganado del formulario"),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -103,10 +138,28 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
     }
   }
 
+  String? _validateWeight(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Campo requerido';
+    final val = double.tryParse(value.trim());
+    if (val == null) return 'Ingrese un número válido';
+    if (val <= 0) return 'El peso debe ser mayor a 0';
+    if (val > 2000) return 'Peso fuera de rango';
+    return null;
+  }
+
+  String? _validateObservation(String? value) {
+    if (value == null || value.trim().isEmpty) return null; // opcional
+    if (value.trim().length > 250) return 'Observación muy larga (máx. 250)';
+    return null;
+  }
+
   Future<void> _saveForm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_company == null || _cattle == null) {
+    if (_company == null ||
+        _cattle == null ||
+        _company!.id == null ||
+        _cattle!.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("No se pudo cargar empresa/ganado.")),
       );
@@ -116,16 +169,20 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
     setState(() => _saving = true);
 
     try {
+      final weightValue = double.tryParse(_weightController.text.trim()) ?? 0.0;
+
       final weight = Weight(
         id: widget.weight?.id,
         date: _dateController.text.trim(),
-        weight: double.tryParse(_weightController.text) ?? 0.0,
+        weight: weightValue,
         observation: _observationController.text.trim(),
         cattleId: _cattle!.id!,
         companyId: _company!.id!,
         cattle: _cattle,
         company: _company,
-        sync: true,
+
+        // ✅ sync int 0/1 (según tu regla)
+        sync: 1,
       );
 
       bool ok;
@@ -190,7 +247,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        //  Empresa fija (solo mostrar)
                         TextFormField(
                           initialValue: _company?.companyName ?? '---',
                           readOnly: true,
@@ -202,7 +258,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                         ),
                         const SizedBox(height: 15),
 
-                        //  Ganado fijo (solo mostrar)
                         TextFormField(
                           initialValue:
                               "${_cattle?.name ?? '---'} (${_cattle?.code ?? '-'})",
@@ -215,7 +270,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                         ),
                         const SizedBox(height: 15),
 
-                        // Fecha
                         TextFormField(
                           controller: _dateController,
                           readOnly: true,
@@ -233,29 +287,20 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                         ),
                         const SizedBox(height: 15),
 
-                        // Peso
                         TextFormField(
                           controller: _weightController,
-                          keyboardType: TextInputType.number,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           decoration: const InputDecoration(
                             labelText: 'Peso (kg)',
                             prefixIcon: Icon(Icons.monitor_weight),
                             border: OutlineInputBorder(),
                           ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Campo requerido';
-                            }
-                            final val = double.tryParse(value);
-                            if (val == null || val <= 0) {
-                              return 'Ingrese un número válido';
-                            }
-                            return null;
-                          },
+                          validator: _validateWeight,
                         ),
                         const SizedBox(height: 15),
 
-                        // Observación
                         TextFormField(
                           controller: _observationController,
                           maxLines: 2,
@@ -264,6 +309,7 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                             prefixIcon: Icon(Icons.note_alt),
                             border: OutlineInputBorder(),
                           ),
+                          validator: _validateObservation,
                         ),
                       ],
                     ),

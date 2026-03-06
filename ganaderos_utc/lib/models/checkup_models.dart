@@ -8,15 +8,18 @@ class Checkup {
   final String diagnosis;
   final String treatment;
   final String observation;
+
   final int cattleId;
   final int companyId;
+
+  /// sync: 1 = sincronizado, 0 = no sincronizado
   final int sync;
 
   // Relaciones anidadas
   final Cattle? cattle;
   final Company? company;
 
-  Checkup({
+  const Checkup({
     this.id,
     required this.date,
     required this.symptom,
@@ -30,28 +33,29 @@ class Checkup {
     required this.sync,
   });
 
-  // Convertir desde JSON / Map
   factory Checkup.fromMap(Map<String, dynamic> map) {
+    final c = map['cattle'];
+    final co = map['company'];
+
     return Checkup(
-      id: map['id'],
-      date: map['date'] ?? '',
-      symptom: map['symptom'] ?? '',
-      diagnosis: map['diagnosis'] ?? '',
-      treatment: map['treatment'] ?? '',
-      observation: map['observation'] ?? '',
-      cattleId: map['cattle_id'] ?? 0,
-      companyId: map['company_id'] ?? 0,
+      id: _asInt(map['id']),
+      date: (map['date'] ?? '').toString().trim(),
+      symptom: (map['symptom'] ?? '').toString().trim(),
+      diagnosis: (map['diagnosis'] ?? '').toString().trim(),
+      treatment: (map['treatment'] ?? '').toString().trim(),
+      observation: (map['observation'] ?? '').toString().trim(),
 
-      // Relaciones anidadas seguras
-      cattle: map['cattle'] != null ? Cattle.fromMap(map['cattle']) : null,
-      company: map['company'] != null ? Company.fromMap(map['company']) : null,
+      cattleId: _asInt(map['cattle_id']) ?? 0,
+      companyId: _asInt(map['company_id']) ?? 0,
 
-      // Normalizar sync
-      sync: map['sync'] is bool ? (map['sync'] ? 1 : 0) : (map['sync'] ?? 0),
+      cattle: c is Map ? Cattle.fromMap(Map<String, dynamic>.from(c)) : null,
+      company:
+          co is Map ? Company.fromMap(Map<String, dynamic>.from(co)) : null,
+
+      sync: _asIntBool(map['sync']),
     );
   }
 
-  // Convertir a Map para BD/API
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -64,5 +68,26 @@ class Checkup {
       'company_id': companyId,
       'sync': sync,
     };
+  }
+
+  // ---------------- HELPERS ----------------
+
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString().trim());
+  }
+
+  /// Convierte true/false, 1/0, "1"/"0", "true"/"false" a int 1/0
+  static int _asIntBool(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v == 1 ? 1 : 0;
+    if (v is num) return v.toInt() == 1 ? 1 : 0;
+    if (v is bool) return v ? 1 : 0;
+
+    final s = v.toString().trim().toLowerCase();
+    if (s == '1' || s == 'true' || s == 'yes' || s == 'si') return 1;
+    return 0;
   }
 }

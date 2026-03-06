@@ -191,8 +191,88 @@ class _CollectionTableViewByCattleState
     );
   }
 
+  String _safeObs(Collection it) {
+    final s = (it.observation ?? '').trim();
+    return s.isEmpty ? '-' : s;
+  }
+
+  String _illnessLabel(int? v) {
+    if (v == null) return '-';
+    if (v == 1) return '1';
+    if (v == 2) return '2';
+    return '$v';
+  }
+
+  // ✅ Card para móvil
+  Widget _collectionCard(Collection it) {
+    final id = it.id ?? 0;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "Recolección #${id > 0 ? id : '-'}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: "Editar",
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () => _onEdit(it),
+                ),
+                IconButton(
+                  tooltip: "Eliminar",
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _onDelete(id),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            _kv("Fecha", it.date),
+            _kv("Litros", it.litres.toStringAsFixed(2)),
+            _kv("Enfermedad", _illnessLabel(it.illness)),
+            _kv("Densidad", it.density.toStringAsFixed(2)),
+            _kv("Observación", _safeObs(it)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kv(String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(color: Colors.black87),
+          children: [
+            TextSpan(
+              text: "$k: ",
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: v),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+    final bool isMobile = width < 700; // umbral ajustable
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Recolección - ${widget.cattleName}"),
@@ -207,7 +287,6 @@ class _CollectionTableViewByCattleState
           ),
         ),
         child: Container(
-          // Overlay para legibilidad
           color: Colors.black.withOpacity(0.06),
           child:
               isLoading
@@ -221,23 +300,32 @@ class _CollectionTableViewByCattleState
                           runSpacing: 10,
                           alignment: WrapAlignment.start,
                           children: [
-                            ElevatedButton.icon(
-                              onPressed: _onAdd,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Agregar Recolección'),
-                              style: _topButtonStyle(Colors.green.shade700),
+                            SizedBox(
+                              width: isMobile ? double.infinity : null,
+                              child: ElevatedButton.icon(
+                                onPressed: _onAdd,
+                                icon: const Icon(Icons.add),
+                                label: const Text('Agregar Recolección'),
+                                style: _topButtonStyle(Colors.green.shade700),
+                              ),
                             ),
-                            ElevatedButton.icon(
-                              onPressed: _load,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Actualizar'),
-                              style: _topButtonStyle(Colors.green.shade500),
+                            SizedBox(
+                              width: isMobile ? double.infinity : null,
+                              child: ElevatedButton.icon(
+                                onPressed: _load,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Actualizar'),
+                                style: _topButtonStyle(Colors.green.shade500),
+                              ),
                             ),
-                            ElevatedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back),
-                              label: const Text('Regresar'),
-                              style: _topButtonStyle(Colors.teal.shade600),
+                            SizedBox(
+                              width: isMobile ? double.infinity : null,
+                              child: ElevatedButton.icon(
+                                onPressed: () => Navigator.pop(context),
+                                icon: const Icon(Icons.arrow_back),
+                                label: const Text('Regresar'),
+                                style: _topButtonStyle(Colors.teal.shade600),
+                              ),
                             ),
                           ],
                         ),
@@ -261,6 +349,15 @@ class _CollectionTableViewByCattleState
                                       ),
                                     ),
                                   )
+                                  : isMobile
+                                  // ✅ MÓVIL: cards
+                                  ? ListView.builder(
+                                    itemCount: paginatedData.length,
+                                    itemBuilder:
+                                        (_, i) =>
+                                            _collectionCard(paginatedData[i]),
+                                  )
+                                  // ✅ DESKTOP/TABLET: tabla
                                   : SingleChildScrollView(
                                     controller: _verticalController,
                                     child: SingleChildScrollView(
@@ -303,10 +400,13 @@ class _CollectionTableViewByCattleState
                                           ],
                                           rows:
                                               paginatedData.map((it) {
+                                                final id = it.id ?? 0;
                                                 return DataRow(
                                                   cells: [
                                                     DataCell(
-                                                      Text('${it.id ?? '-'}'),
+                                                      Text(
+                                                        id > 0 ? '$id' : '-',
+                                                      ),
                                                     ),
                                                     DataCell(Text(it.date)),
                                                     DataCell(
@@ -316,7 +416,11 @@ class _CollectionTableViewByCattleState
                                                       ),
                                                     ),
                                                     DataCell(
-                                                      Text('${it.illness}'),
+                                                      Text(
+                                                        _illnessLabel(
+                                                          it.illness,
+                                                        ),
+                                                      ),
                                                     ),
                                                     DataCell(
                                                       Text(
@@ -325,9 +429,7 @@ class _CollectionTableViewByCattleState
                                                       ),
                                                     ),
                                                     DataCell(
-                                                      Text(
-                                                        it.observation ?? '-',
-                                                      ),
+                                                      Text(_safeObs(it)),
                                                     ),
                                                     DataCell(
                                                       Row(
@@ -351,7 +453,7 @@ class _CollectionTableViewByCattleState
                                                             ),
                                                             onPressed:
                                                                 () => _onDelete(
-                                                                  it.id ?? 0,
+                                                                  id,
                                                                 ),
                                                           ),
                                                         ],

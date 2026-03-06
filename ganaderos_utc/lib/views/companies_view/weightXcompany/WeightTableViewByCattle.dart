@@ -30,7 +30,6 @@ class _WeightTableViewByCattleState extends State<WeightTableViewByCattle> {
   final ScrollController _horizontalController = ScrollController();
 
   int currentPage = 1;
-  final int rowsPerPage = 10;
 
   @override
   void initState() {
@@ -43,6 +42,12 @@ class _WeightTableViewByCattleState extends State<WeightTableViewByCattle> {
     _verticalController.dispose();
     _horizontalController.dispose();
     super.dispose();
+  }
+
+  // ✅ rowsPerPage responsive (móvil web vs escritorio)
+  int _rowsPerPage(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    return (w < 600) ? 5 : 10;
   }
 
   Future<void> _load() async {
@@ -154,7 +159,9 @@ class _WeightTableViewByCattleState extends State<WeightTableViewByCattle> {
     }
   }
 
-  List<Weight> get paginatedData {
+  List<Weight> _paginatedData(BuildContext context) {
+    final rowsPerPage = _rowsPerPage(context);
+
     if (list.isEmpty) return [];
     final start = (currentPage - 1) * rowsPerPage;
     if (start >= list.length) return [];
@@ -162,14 +169,19 @@ class _WeightTableViewByCattleState extends State<WeightTableViewByCattle> {
     return list.sublist(start, end > list.length ? list.length : end);
   }
 
-  int get totalPages => list.isEmpty ? 1 : (list.length / rowsPerPage).ceil();
+  int _totalPages(BuildContext context) {
+    final rowsPerPage = _rowsPerPage(context);
+    return list.isEmpty ? 1 : (list.length / rowsPerPage).ceil();
+  }
+
   void goToPage(int page) => setState(() => currentPage = page);
 
-  ButtonStyle _topButtonStyle(Color bg) {
+  ButtonStyle _topButtonStyle(Color bg, {bool fullWidth = false}) {
     return ElevatedButton.styleFrom(
       backgroundColor: bg,
       foregroundColor: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      minimumSize: fullWidth ? const Size.fromHeight(44) : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 2,
     );
@@ -196,6 +208,10 @@ class _WeightTableViewByCattleState extends State<WeightTableViewByCattle> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final rows = _paginatedData(context);
+    final totalPages = _totalPages(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Pesos - ${widget.cattleName}"),
@@ -216,33 +232,77 @@ class _WeightTableViewByCattleState extends State<WeightTableViewByCattle> {
                   ? const Center(child: CircularProgressIndicator())
                   : Column(
                     children: [
+                      // ✅ Botones responsive
                       Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          alignment: WrapAlignment.start,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _onAdd,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Agregar Peso'),
-                              style: _topButtonStyle(Colors.green.shade700),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: _load,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Actualizar'),
-                              style: _topButtonStyle(Colors.green.shade500),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back),
-                              label: const Text('Regresar'),
-                              style: _topButtonStyle(Colors.teal.shade600),
-                            ),
-                          ],
-                        ),
+                        child:
+                            isMobile
+                                ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _onAdd,
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Agregar Peso'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade700,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ElevatedButton.icon(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Actualizar'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade500,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ElevatedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.arrow_back),
+                                      label: const Text('Regresar'),
+                                      style: _topButtonStyle(
+                                        Colors.teal.shade600,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                                : Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  alignment: WrapAlignment.start,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _onAdd,
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Agregar Peso'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade700,
+                                      ),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Actualizar'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade500,
+                                      ),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.arrow_back),
+                                      label: const Text('Regresar'),
+                                      style: _topButtonStyle(
+                                        Colors.teal.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                       ),
 
                       Expanded(
@@ -266,87 +326,131 @@ class _WeightTableViewByCattleState extends State<WeightTableViewByCattle> {
                                     child: SingleChildScrollView(
                                       controller: _horizontalController,
                                       scrollDirection: Axis.horizontal,
-                                      child: _tableCard(
-                                        DataTable(
-                                          columnSpacing: 30,
-                                          headingRowColor:
-                                              WidgetStateProperty.all(
-                                                Colors.black.withOpacity(0.85),
+                                      child: ConstrainedBox(
+                                        // ✅ mínimo ancho para que no se rompa en móvil web
+                                        constraints: BoxConstraints(
+                                          minWidth: isMobile ? 720 : 860,
+                                        ),
+                                        child: _tableCard(
+                                          DataTable(
+                                            columnSpacing: isMobile ? 18 : 30,
+                                            headingRowColor:
+                                                WidgetStateProperty.all(
+                                                  Colors.black.withOpacity(
+                                                    0.85,
+                                                  ),
+                                                ),
+                                            headingTextStyle: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            dataRowColor:
+                                                WidgetStateProperty.resolveWith(
+                                                  (states) =>
+                                                      states.contains(
+                                                            WidgetState.hovered,
+                                                          )
+                                                          ? Colors.grey
+                                                              .withOpacity(0.15)
+                                                          : Colors.white
+                                                              .withOpacity(
+                                                                0.92,
+                                                              ),
+                                                ),
+                                            columns: const [
+                                              DataColumn(label: Text('ID')),
+                                              DataColumn(label: Text('Fecha')),
+                                              DataColumn(
+                                                label: Text('Peso (kg)'),
                                               ),
-                                          headingTextStyle: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
+                                              DataColumn(
+                                                label: Text('Observación'),
+                                              ),
+                                              DataColumn(
+                                                label: Text('Acciones'),
+                                              ),
+                                            ],
+                                            rows:
+                                                rows.map((it) {
+                                                  final id = it.id ?? 0;
+
+                                                  // ✅ FIX: observation nullable
+                                                  final obs =
+                                                      (it.observation == null ||
+                                                              it.observation!
+                                                                  .trim()
+                                                                  .isEmpty)
+                                                          ? '-'
+                                                          : it.observation!
+                                                              .trim();
+
+                                                  return DataRow(
+                                                    cells: [
+                                                      DataCell(
+                                                        Text(
+                                                          id > 0 ? '$id' : '-',
+                                                        ),
+                                                      ),
+                                                      DataCell(Text(it.date)),
+                                                      DataCell(
+                                                        Text(
+                                                          it.weight
+                                                              .toStringAsFixed(
+                                                                2,
+                                                              ),
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        SizedBox(
+                                                          width:
+                                                              isMobile
+                                                                  ? 260
+                                                                  : 340,
+                                                          child: Text(
+                                                            obs,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            maxLines: 2,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        Row(
+                                                          children: [
+                                                            IconButton(
+                                                              tooltip: "Editar",
+                                                              icon: const Icon(
+                                                                Icons.edit,
+                                                                color:
+                                                                    Colors.blue,
+                                                              ),
+                                                              onPressed:
+                                                                  () => _onEdit(
+                                                                    it,
+                                                                  ),
+                                                            ),
+                                                            IconButton(
+                                                              tooltip:
+                                                                  "Eliminar",
+                                                              icon: const Icon(
+                                                                Icons.delete,
+                                                                color:
+                                                                    Colors.red,
+                                                              ),
+                                                              onPressed:
+                                                                  () =>
+                                                                      _onDelete(
+                                                                        id,
+                                                                      ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                }).toList(),
                                           ),
-                                          dataRowColor:
-                                              WidgetStateProperty.resolveWith(
-                                                (states) =>
-                                                    states.contains(
-                                                          WidgetState.hovered,
-                                                        )
-                                                        ? Colors.grey
-                                                            .withOpacity(0.15)
-                                                        : Colors.white
-                                                            .withOpacity(0.92),
-                                              ),
-                                          columns: const [
-                                            DataColumn(label: Text('ID')),
-                                            DataColumn(label: Text('Fecha')),
-                                            DataColumn(
-                                              label: Text('Peso (kg)'),
-                                            ),
-                                            DataColumn(
-                                              label: Text('Observación'),
-                                            ),
-                                            DataColumn(label: Text('Acciones')),
-                                          ],
-                                          rows:
-                                              paginatedData.map((it) {
-                                                return DataRow(
-                                                  cells: [
-                                                    DataCell(
-                                                      Text('${it.id ?? '-'}'),
-                                                    ),
-                                                    DataCell(Text(it.date)),
-                                                    DataCell(
-                                                      Text(
-                                                        it.weight
-                                                            .toStringAsFixed(2),
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      Text(it.observation),
-                                                    ),
-                                                    DataCell(
-                                                      Row(
-                                                        children: [
-                                                          IconButton(
-                                                            tooltip: "Editar",
-                                                            icon: const Icon(
-                                                              Icons.edit,
-                                                              color:
-                                                                  Colors.blue,
-                                                            ),
-                                                            onPressed:
-                                                                () =>
-                                                                    _onEdit(it),
-                                                          ),
-                                                          IconButton(
-                                                            tooltip: "Eliminar",
-                                                            icon: const Icon(
-                                                              Icons.delete,
-                                                              color: Colors.red,
-                                                            ),
-                                                            onPressed:
-                                                                () => _onDelete(
-                                                                  it.id ?? 0,
-                                                                ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    ),
-                                                  ],
-                                                );
-                                              }).toList(),
                                         ),
                                       ),
                                     ),

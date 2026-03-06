@@ -7,7 +7,9 @@ class OriginRepository {
   // Obtener todos los orígenes
   static Future<List<Origin>> getAll() async {
     try {
-      final List<dynamic> dataList = await ApiConnection.get(endpoint);
+      final List<Map<String, dynamic>> dataList = await ApiConnection.get(
+        endpoint,
+      );
       return dataList.map((data) => Origin.fromMap(data)).toList();
     } catch (e) {
       print("Error al obtener orígenes: $e");
@@ -32,12 +34,11 @@ class OriginRepository {
   Future<bool> updateOrigin(Origin origin) async {
     if (origin.id == null) return false;
     try {
-      final response = await ApiConnection.patch(
+      final int result = (await ApiConnection.patch(
         '$endpoint/${origin.id}',
         origin.toMap(),
-      );
-      // ignore: unnecessary_null_comparison
-      return response != null;
+      ));
+      return result > 0;
     } catch (e) {
       print("Error al actualizar origen: $e");
       return false;
@@ -47,9 +48,8 @@ class OriginRepository {
   // Eliminar un origen por ID
   Future<bool> deleteOrigin(int id) async {
     try {
-      final response = await ApiConnection.delete('$endpoint/$id');
-      // ignore: unnecessary_null_comparison
-      return response != null;
+      final int result = (await ApiConnection.delete('$endpoint/$id'));
+      return result > 0;
     } catch (e) {
       print("Error al eliminar origen: $e");
       return false;

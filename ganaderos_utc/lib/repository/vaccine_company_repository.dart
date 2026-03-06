@@ -8,45 +8,29 @@ class VaccineCompanyRepository {
   // Obtener vacunas por CATTLE ID (filtrado seguro)
   static Future<List<Vaccine>> getAllByCattle(int cattleId) async {
     try {
-      final dynamic response = await ApiConnection.get(
+      // ✅ coherente con ApiConnection: getList siempre devuelve lista
+      final List<Map<String, dynamic>> rawList = await ApiConnection.getList(
         "$_basePath?cattleId=$cattleId",
       );
-
-      if (response == null) return [];
-
-      //  Parseo flexible (List o {data: []})
-      List<dynamic> rawList = [];
-      if (response is List) {
-        rawList = response;
-      } else if (response is Map && response['data'] is List) {
-        rawList = response['data'] as List;
-      } else {
-        print(" Formato inesperado en $_basePath: $response");
-        return [];
-      }
 
       final parsed =
           rawList
               .map((item) => Vaccine.fromMap(Map<String, dynamic>.from(item)))
               .toList();
 
-      //  FILTRO FINAL por si la API no filtra
-      final filtered =
-          parsed.where((v) {
-            // Prioridad 1: campo directo cattleId
-            // ignore: unnecessary_null_comparison
-            if (v.cattleId != null) return v.cattleId == cattleId;
+      // ✅ FILTRO FINAL por si la API no filtra
+      return parsed.where((v) {
+        // campo directo
+        if (v.cattleId == cattleId) return true;
 
-            // Prioridad 2: objeto cattle anidado
-            final nestedId = v.cattle?.id;
-            if (nestedId != null) return nestedId == cattleId;
+        // respaldo: objeto anidado cattle
+        final nestedId = v.cattle?.id;
+        if (nestedId != null) return nestedId == cattleId;
 
-            return false;
-          }).toList();
-
-      return filtered;
+        return false;
+      }).toList();
     } catch (e) {
-      print(" Error al obtener vacunas por cattleId=$cattleId: $e");
+      print("❌ Error al obtener vacunas por cattleId=$cattleId: $e");
       return [];
     }
   }
@@ -54,24 +38,20 @@ class VaccineCompanyRepository {
   // Crear vacuna (requiere cattleId)
   static Future<Vaccine?> createForCattle(Vaccine vaccine) async {
     try {
-      // ignore: unnecessary_null_comparison
-      if (vaccine.cattleId == null || vaccine.cattleId == 0) {
+      if (vaccine.cattleId == 0) {
         throw Exception("cattleId es requerido para crear una vacuna.");
       }
 
-      final dynamic response = await ApiConnection.post(
-        _basePath,
-        vaccine.toMap(),
-      );
+      final response = await ApiConnection.post(_basePath, vaccine.toMap());
 
-      if (response != null && response is Map) {
+      if (response != null) {
         return Vaccine.fromMap(Map<String, dynamic>.from(response));
       }
 
-      print(" Respuesta inesperada al crear vacuna: $response");
+      print("⚠️ Respuesta inesperada al crear vacuna: $response");
       return null;
     } catch (e) {
-      print(" Error al crear vacuna: $e");
+      print("❌ Error al crear vacuna: $e");
       return null;
     }
   }
@@ -90,10 +70,10 @@ class VaccineCompanyRepository {
       if (response is Map && response['success'] == true) return true;
       if (response is Map && response['id'] != null) return true;
 
-      print(" Respuesta inesperada al actualizar vacuna: $response");
+      print("⚠️ Respuesta inesperada al actualizar vacuna: $response");
       return false;
     } catch (e) {
-      print(" Error al actualizar vacuna: $e");
+      print("❌ Error al actualizar vacuna: $e");
       return false;
     }
   }
@@ -108,7 +88,7 @@ class VaccineCompanyRepository {
 
       return false;
     } catch (e) {
-      print(" Error al eliminar vacuna: $e");
+      print("❌ Error al eliminar vacuna: $e");
       return false;
     }
   }

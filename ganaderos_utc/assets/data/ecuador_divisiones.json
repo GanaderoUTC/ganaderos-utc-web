@@ -1,0 +1,466 @@
+{
+    "Azuay": {
+        "Cuenca": [
+            "El Sagrario",
+            "El Vecino",
+            "San Sebastián",
+            "Yanuncay",
+            "Baños",
+            "Sayausí",
+            "Sinincay"
+        ],
+        "Gualaceo": [
+            "Gualaceo",
+            "Luis Cordero",
+            "Remigio Crespo",
+            "San Juan"
+        ],
+        "Paute": [
+            "Paute",
+            "Bulán",
+            "Chicán",
+            "Guarainag",
+            "San Cristóbal"
+        ]
+    },
+    "Bolívar": {
+        "Guaranda": [
+            "Ángel Polibio Chávez",
+            "Gabriel Ignacio Veintimilla",
+            "Guanujo"
+        ],
+        "San Miguel": [
+            "San Miguel",
+            "Balsapamba",
+            "Bilován",
+            "Regulo de Mora"
+        ],
+        "Chillanes": [
+            "Chillanes",
+            "San José del Tambo"
+        ]
+    },
+    "Cañar": {
+        "Azogues": [
+            "Azogues",
+            "Cojitambo",
+            "Guapán",
+            "Javier Loyola",
+            "San Miguel"
+        ],
+        "La Troncal": [
+            "La Troncal",
+            "Pancho Negro",
+            "Manuel J Calle"
+        ],
+        "Cañar": [
+            "Cañar",
+            "Chontamarca",
+            "Gualleturo",
+            "Honorato Vásquez"
+        ]
+    },
+    "Carchi": {
+        "Tulcán": [
+            "Tulcán",
+            "El Carmelo",
+            "Julio Andrade",
+            "Tufiño"
+        ],
+        "Montúfar": [
+            "San Gabriel",
+            "La Paz",
+            "Cristóbal Colón"
+        ],
+        "Mira": [
+            "Mira",
+            "Juan Montalvo",
+            "La Concepción"
+        ]
+    },
+    "Chimborazo": {
+        "Riobamba": [
+            "Lizarzaburu",
+            "Velasco",
+            "Yaruquíes",
+            "San Luis",
+            "Licto"
+        ],
+        "Guano": [
+            "Guano",
+            "Guanando",
+            "Ilapo",
+            "San Andrés"
+        ],
+        "Colta": [
+            "Colta",
+            "Cañi",
+            "Juan de Velasco"
+        ]
+    },
+    "Cotopaxi": {
+        "Latacunga": [
+            "Eloy Alfaro",
+            "Ignacio Flores",
+            "Juan Montalvo",
+            "La Matriz",
+            "San Buenaventura",
+            "Mulaló",
+            "Guaytacama",
+            "Poaló",
+            "Tanicuchí",
+            "Toacaso"
+        ],
+        "Salcedo": [
+            "San Miguel",
+            "Antonio José Holguín",
+            "Cusubamba",
+            "Mulalillo",
+            "Panzaleo"
+        ],
+        "Saquisilí": [
+            "Saquisilí",
+            "Canchagua",
+            "Chantilín",
+            "Cochapamba"
+        ],
+        "Pujilí": [
+            "Pujilí",
+            "Angamarca",
+            "Guangaje",
+            "La Victoria",
+            "Pilaló",
+            "Tingo",
+            "Zumbahua"
+        ]
+    },
+    "El Oro": {
+        "Machala": [
+            "Machala",
+            "Puerto Bolívar",
+            "El Retiro"
+        ],
+        "Pasaje": [
+            "Pasaje",
+            "Buenavista",
+            "Casacay",
+            "La Peaña"
+        ],
+        "Santa Rosa": [
+            "Santa Rosa",
+            "Bellamaría",
+            "Jambelí",
+            "La Victoria"
+        ]
+    },
+    "Esmeraldas": {
+        "Esmeraldas": [
+            "Esmeraldas",
+            "Atacames",
+            "Tonsupa",
+            "Vuelta Larga"
+        ],
+        "Quinindé": [
+            "Quinindé",
+            "Malimpia",
+            "Rosa Zárate"
+        ],
+        "Muisne": [
+            "Muisne",
+            "Bolívar",
+            "San Gregorio"
+        ]
+    },
+    "Galápagos": {
+        "San Cristóbal": [
+            "Puerto Baquerizo Moreno",
+            "El Progreso"
+        ],
+        "Santa Cruz": [
+            "Puerto Ayora",
+            "Bellavista",
+            "Santa Rosa"
+        ],
+        "Isabela": [
+            "Puerto Villamil",
+            "Tomás de Berlanga"
+        ]
+    },
+    "Guayas": {
+        "Guayaquil": [
+            "Tarqui",
+            "Ximena",
+            "Febres Cordero",
+            "Urdaneta",
+            "Letamendi",
+            "Pascuales",
+            "Chongón"
+        ],
+        "Daule": [
+            "Daule",
+            "La Aurora",
+            "Los Lojas"
+        ],
+        "Milagro": [
+            "Milagro",
+            "Roberto Astudillo",
+            "Mariscal Sucre"
+        ]
+    },
+    "Imbabura": {
+        "Ibarra": [
+            "Caranqui",
+            "El Sagrario",
+            "San Francisco",
+            "La Dolorosa",
+            "Ambuquí",
+            "Angochagua"
+        ],
+        "Otavalo": [
+            "Otavalo",
+            "Eugenio Espejo",
+            "San Pablo",
+            "San Rafael"
+        ],
+        "Cotacachi": [
+            "Cotacachi",
+            "Apuela",
+            "Imantag",
+            "Quiroga"
+        ]
+    },
+    "Loja": {
+        "Loja": [
+            "El Valle",
+            "San Sebastián",
+            "Sucre",
+            "Valle",
+            "Vilcabamba",
+            "Malacatos"
+        ],
+        "Catamayo": [
+            "Catamayo",
+            "El Tambo",
+            "San Pedro de la Bendita"
+        ],
+        "Saraguro": [
+            "Saraguro",
+            "El Paraíso de Celén",
+            "Manú"
+        ]
+    },
+    "Los Ríos": {
+        "Babahoyo": [
+            "Babahoyo",
+            "Caracol",
+            "Febres Cordero",
+            "Pimocha"
+        ],
+        "Quevedo": [
+            "Quevedo",
+            "San Camilo",
+            "San Cristóbal"
+        ],
+        "Vinces": [
+            "Vinces",
+            "Antonio Sotomayor"
+        ]
+    },
+    "Manabí": {
+        "Portoviejo": [
+            "Portoviejo",
+            "Abdón Calderón",
+            "Alhajuela",
+            "Crucita",
+            "San Plácido"
+        ],
+        "Manta": [
+            "Manta",
+            "Tarqui",
+            "Los Esteros",
+            "San Mateo",
+            "Santa Marianita"
+        ],
+        "Chone": [
+            "Chone",
+            "Boyacá",
+            "Canuto",
+            "Convento"
+        ]
+    },
+    "Morona Santiago": {
+        "Macas": [
+            "Macas",
+            "General Proaño",
+            "Sevilla Don Bosco"
+        ],
+        "Gualaquiza": [
+            "Gualaquiza",
+            "Bomboiza",
+            "Nueva Tarqui"
+        ],
+        "Sucúa": [
+            "Sucúa",
+            "Asunción",
+            "Huambi"
+        ]
+    },
+    "Napo": {
+        "Tena": [
+            "Tena",
+            "Ahuano",
+            "Chontapunta",
+            "Talag"
+        ],
+        "Archidona": [
+            "Archidona",
+            "Cotundo",
+            "Hatun Sumaco"
+        ],
+        "El Chaco": [
+            "El Chaco",
+            "Gonzalo Díaz de Pineda"
+        ]
+    },
+    "Orellana": {
+        "Francisco de Orellana": [
+            "El Coca",
+            "Dayuma",
+            "Taracoa"
+        ],
+        "La Joya de los Sachas": [
+            "La Joya de los Sachas",
+            "Pompeya"
+        ],
+        "Loreto": [
+            "Loreto",
+            "Ávila",
+            "San José de Payamino"
+        ]
+    },
+    "Pastaza": {
+        "Puyo": [
+            "Puyo",
+            "Fátima",
+            "Tarqui",
+            "Veracruz"
+        ],
+        "Mera": [
+            "Mera",
+            "Madre Tierra",
+            "Shell"
+        ],
+        "Santa Clara": [
+            "Santa Clara",
+            "San José"
+        ]
+    },
+    "Pichincha": {
+        "Quito": [
+            "Centro Histórico",
+            "La Mariscal",
+            "Chillogallo",
+            "Cotocollao",
+            "Carcelén",
+            "Guamaní",
+            "Tumbaco",
+            "Cumbayá",
+            "Nayón",
+            "Pifo",
+            "Tababela",
+            "Yaruquí"
+        ],
+        "Rumiñahui": [
+            "Sangolquí",
+            "San Rafael",
+            "Cotogchoa",
+            "Rumipamba"
+        ],
+        "Mejía": [
+            "Machachi",
+            "Alóag",
+            "Aloasí",
+            "Cutuglagua",
+            "Tambillo"
+        ]
+    },
+    "Santa Elena": {
+        "Santa Elena": [
+            "Santa Elena",
+            "Manglaralto",
+            "Chanduy"
+        ],
+        "La Libertad": [
+            "La Libertad"
+        ],
+        "Salinas": [
+            "Salinas",
+            "Anconcito",
+            "José Luis Tamayo"
+        ]
+    },
+    "Santo Domingo de los Tsáchilas": {
+        "Santo Domingo": [
+            "Santo Domingo",
+            "Alluriquín",
+            "Luz de América",
+            "Puerto Limón"
+        ]
+    },
+    "Sucumbíos": {
+        "Nueva Loja": [
+            "Nueva Loja",
+            "Dureno",
+            "El Eno"
+        ],
+        "Shushufindi": [
+            "Shushufindi",
+            "Limoncocha",
+            "San Roque"
+        ],
+        "Cascales": [
+            "El Dorado de Cascales",
+            "Santa Rosa de Sucumbíos"
+        ]
+    },
+    "Tungurahua": {
+        "Ambato": [
+            "Atocha",
+            "Celiano Monge",
+            "Huachi Chico",
+            "Huachi Loreto",
+            "La Merced",
+            "Pinllo",
+            "Quisapincha"
+        ],
+        "Baños": [
+            "Baños",
+            "Lligua",
+            "Río Verde",
+            "Río Negro"
+        ],
+        "Pelileo": [
+            "Pelileo",
+            "Benítez",
+            "Bolívar",
+            "Cotaló",
+            "Huambaló"
+        ]
+    },
+    "Zamora Chinchipe": {
+        "Zamora": [
+            "Zamora",
+            "Cumbaratza",
+            "Guadalupe",
+            "Sabanilla"
+        ],
+        "Yantzaza": [
+            "Yantzaza",
+            "Los Encuentros"
+        ],
+        "El Pangui": [
+            "El Pangui",
+            "Tundayme"
+        ]
+    }
+}

@@ -6,25 +6,35 @@ class StatsRepository {
     int? companyId,
     int days = 30,
   }) async {
-    // 1) Traer datos desde tus endpoints reales
-    final collections = await ApiConnection.getList('/collection');
-    final weights = await ApiConnection.getList('/weight');
-    final cattle = await ApiConnection.getList('/cattle');
-    final checkups = await ApiConnection.getList('/checkup');
-    final vaccines = await ApiConnection.getList('/vaccines');
+    final collections = await ApiConnection.getList(
+      _withCompany('/collection', companyId),
+    );
 
-    // si existen en tu API, no deben romper el dashboard
+    final weights = await ApiConnection.getList(
+      _withCompany('/Weight', companyId),
+    );
+
+    final cattle = await ApiConnection.getList(
+      _withCompany('/cattle', companyId),
+    );
+
+    final checkups = await ApiConnection.getList(
+      _withCompany('/checkup', companyId),
+    );
+
+    final vaccines = await ApiConnection.getList(
+      _withCompany('/vaccines', companyId),
+    );
+
     final companies = await _safeGetList('/companies');
     final users = await _safeGetList('/users');
 
-    // 2) Filtrar por companyId (si aplica)
     final collectionsF = _filterByCompany(collections, companyId);
     final weightsF = _filterByCompany(weights, companyId);
     final cattleF = _filterByCompany(cattle, companyId);
     final checkupsF = _filterByCompany(checkups, companyId);
     final vaccinesF = _filterByCompany(vaccines, companyId);
 
-    // 3) Filtro por rango de días (para gráficas y sumas del mes/rango)
     final now = DateTime.now();
     final from = DateTime(
       now.year,
@@ -38,11 +48,11 @@ class StatsRepository {
           return d != null && !d.isBefore(from);
         }).toList();
 
-    // 4) SUMMARY (cards)
+    /// SUMMARY
+
     final totalCattle = cattleF.length;
     final totalCompanies = companyId == null ? companies.length : 1;
 
-    // users solo sirve para admin; si no existe endpoint, quedará 0 y no rompe
     final totalUsers =
         companyId == null
             ? users.length
@@ -51,8 +61,8 @@ class StatsRepository {
     final totalCheckups = checkupsF.length;
     final totalVaccines = vaccinesF.length;
 
-    // leche hoy
     final today = DateTime(now.year, now.month, now.day);
+
     final milkToday = collectionsF
         .where((e) {
           final d = _parseDate(e['date']);
@@ -60,13 +70,11 @@ class StatsRepository {
         })
         .fold<double>(0, (sum, e) => sum + _asDouble(e['litres']));
 
-    // leche rango (según days: 7/30/90)
     final milkRange = collectionsRange.fold<double>(
       0,
       (sum, e) => sum + _asDouble(e['litres']),
     );
 
-    // peso promedio (general del filtro)
     final avgWeight = _avg(
       weightsF.map((e) => _asDouble(e['weight'])).toList(),
     );
@@ -82,13 +90,10 @@ class StatsRepository {
       avgWeight: avgWeight,
     );
 
-    // 5) MILK BY DAY (línea)
+    /// GRAFICAS
+
     final milkByDay = _groupMilkByDay(collectionsRange);
-
-    // 6) CATTLE BY CATEGORY (barras)
     final cattleByCategory = _groupCattleByCategory(cattleF);
-
-    // 7) PESO PROMEDIO POR GANADO (para gráfico)
     final avgWeightByCattle = _avgWeightByCattle(weightsF, cattleF);
 
     return DashboardStatsResponse(
@@ -99,7 +104,18 @@ class StatsRepository {
     );
   }
 
-  // safe get list (no rompe si hay 404)
+  /// AGREGA companyId A QUERY
+
+  String _withCompany(String endpoint, int? companyId) {
+    if (companyId == null) return endpoint;
+
+    return endpoint.contains('?')
+        ? '$endpoint&companyId=$companyId'
+        : '$endpoint?companyId=$companyId';
+  }
+
+  /// SAFE GET
+
   Future<List<Map<String, dynamic>>> _safeGetList(String endpoint) async {
     try {
       return await ApiConnection.getList(endpoint);
@@ -108,55 +124,7 @@ class StatsRepository {
     }
   }
 
-  // promedio de peso por ganado
-  List<AvgWeightByCattleItem> _avgWeightByCattle(
-    List<Map<String, dynamic>> weightsF,
-    List<Map<String, dynamic>> cattleF,
-  ) {
-    // mapa id -> nombre (usa name, si no, code)
-    final cattleNameById = <int, String>{};
-    for (final c in cattleF) {
-      final id = _asInt(c['id']);
-      if (id == null) continue;
-      final name = (c['name'] ?? c['code'] ?? 'Ganado $id').toString();
-      cattleNameById[id] = name;
-    }
-
-    // acumuladores
-    final sumByCattle = <int, double>{};
-    final countByCattle = <int, int>{};
-
-    for (final w in weightsF) {
-      final cidRaw = w['cattle_id'] ?? w['cattleId'] ?? w['cattle']?['id'];
-      final cattleId = _asInt(cidRaw);
-      if (cattleId == null) continue;
-
-      sumByCattle[cattleId] =
-          (sumByCattle[cattleId] ?? 0) + _asDouble(w['weight']);
-      countByCattle[cattleId] = (countByCattle[cattleId] ?? 0) + 1;
-    }
-
-    // construir lista
-    final list = <AvgWeightByCattleItem>[];
-    for (final entry in sumByCattle.entries) {
-      final id = entry.key;
-      final cnt = countByCattle[id] ?? 1;
-      final avg = entry.value / cnt;
-
-      list.add(
-        AvgWeightByCattleItem(
-          cattleName: cattleNameById[id] ?? 'Ganado $id',
-          avgWeight: avg,
-        ),
-      );
-    }
-
-    // ordenar desc (más pesado primero)
-    list.sort((a, b) => b.avgWeight.compareTo(a.avgWeight));
-    return list;
-  }
-
-  // HELPERS
+  /// FILTRO POR EMPRESA
 
   List<Map<String, dynamic>> _filterByCompany(
     List<Map<String, dynamic>> list,
@@ -170,34 +138,122 @@ class StatsRepository {
     }).toList();
   }
 
+  /// USUARIOS POR EMPRESA
+
   int _countUsersByCompany(List<Map<String, dynamic>> users, int? companyId) {
     if (companyId == null) return users.length;
+
     return users.where((u) {
       final cid = u['company_id'] ?? u['companyId'] ?? u['company']?['id'];
       return _asInt(cid) == companyId;
     }).length;
   }
 
+  /// PESO PROMEDIO POR GANADO
+
+  List<AvgWeightByCattleItem> _avgWeightByCattle(
+    List<Map<String, dynamic>> weightsF,
+    List<Map<String, dynamic>> cattleF,
+  ) {
+    final cattleNameById = <int, String>{};
+
+    for (final c in cattleF) {
+      final id = _asInt(c['id']);
+      if (id == null) continue;
+
+      final name = (c['name'] ?? c['code'] ?? 'Ganado $id').toString();
+      cattleNameById[id] = name;
+    }
+
+    final sumByCattle = <int, double>{};
+    final countByCattle = <int, int>{};
+
+    for (final w in weightsF) {
+      final cidRaw = w['cattle_id'] ?? w['cattleId'] ?? w['cattle']?['id'];
+      final cattleId = _asInt(cidRaw);
+
+      if (cattleId == null) continue;
+
+      sumByCattle[cattleId] =
+          (sumByCattle[cattleId] ?? 0) + _asDouble(w['weight']);
+
+      countByCattle[cattleId] = (countByCattle[cattleId] ?? 0) + 1;
+    }
+
+    final list = <AvgWeightByCattleItem>[];
+
+    for (final entry in sumByCattle.entries) {
+      final id = entry.key;
+      final cnt = countByCattle[id] ?? 1;
+
+      final avg = entry.value / cnt;
+
+      list.add(
+        AvgWeightByCattleItem(
+          cattleName: cattleNameById[id] ?? 'Ganado $id',
+          avgWeight: avg,
+        ),
+      );
+    }
+
+    list.sort((a, b) => b.avgWeight.compareTo(a.avgWeight));
+
+    return list;
+  }
+
+  /// PRODUCCION DE LECHE POR DIA
+
   List<MilkDayItem> _groupMilkByDay(List<Map<String, dynamic>> collections) {
     final map = <String, double>{};
+    final sample = <String, Map<String, dynamic>>{};
 
     for (final e in collections) {
       final d = _parseDate(e['date']);
       if (d == null) continue;
+
       final key =
           '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
       map[key] = (map[key] ?? 0) + _asDouble(e['litres']);
+
+      sample[key] = e;
     }
 
     final items =
         map.entries.map((kv) {
-          final date = DateTime.tryParse(kv.key) ?? DateTime.now();
-          return MilkDayItem(date: date, litres: kv.value);
+          final data = sample[kv.key]!;
+
+          final collectionId = _asInt(data['id'] ?? data['collection_id']) ?? 0;
+
+          final cattleId =
+              _asInt(
+                data['cattle_id'] ?? data['cattleId'] ?? data['cattle']?['id'],
+              ) ??
+              0;
+
+          final companyId =
+              _asInt(
+                data['company_id'] ??
+                    data['companyId'] ??
+                    data['company']?['id'],
+              ) ??
+              0;
+
+          return MilkDayItem(
+            collectionId: collectionId,
+            cattleId: cattleId,
+            companyId: companyId,
+            date: DateTime.tryParse(kv.key) ?? DateTime.now(),
+            litres: kv.value,
+          );
         }).toList();
 
     items.sort((a, b) => a.date.compareTo(b.date));
+
     return items;
   }
+
+  /// GANADO POR CATEGORIA
 
   List<CattleByCategoryItem> _groupCattleByCategory(
     List<Map<String, dynamic>> cattle,
@@ -208,6 +264,7 @@ class StatsRepository {
       String key = '';
 
       final catObj = c['category'];
+
       if (catObj is Map && catObj['name'] != null) {
         key = catObj['name'].toString();
       } else {
@@ -224,13 +281,17 @@ class StatsRepository {
             .toList();
 
     items.sort((a, b) => b.count.compareTo(a.count));
+
     return items;
   }
 
   DateTime? _parseDate(dynamic v) {
     if (v == null) return null;
+
     final s = v.toString().trim();
+
     if (s.isEmpty) return null;
+
     return DateTime.tryParse(s);
   }
 
@@ -239,20 +300,27 @@ class StatsRepository {
 
   double _avg(List<double> values) {
     if (values.isEmpty) return 0;
+
     final sum = values.fold<double>(0, (p, e) => p + e);
+
     return sum / values.length;
   }
 
   double _asDouble(dynamic v) {
     if (v == null) return 0;
+
     if (v is num) return v.toDouble();
+
     return double.tryParse(v.toString()) ?? 0;
   }
 
   int? _asInt(dynamic v) {
     if (v == null) return null;
+
     if (v is int) return v;
+
     if (v is num) return v.toInt();
+
     return int.tryParse(v.toString());
   }
 }

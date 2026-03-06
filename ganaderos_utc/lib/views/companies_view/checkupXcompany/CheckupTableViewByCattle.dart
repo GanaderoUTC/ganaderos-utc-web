@@ -156,6 +156,7 @@ class _CheckupTableViewByCattleState extends State<CheckupTableViewByCattle> {
     if (start >= list.length) return [];
     final end = start + rowsPerPage;
     return list.sublist(start, end > list.length ? list.length : end);
+    // (si quieres paginar también en móvil, se reutiliza)
   }
 
   int get totalPages => list.isEmpty ? 1 : (list.length / rowsPerPage).ceil();
@@ -190,8 +191,85 @@ class _CheckupTableViewByCattleState extends State<CheckupTableViewByCattle> {
     );
   }
 
+  String _safeObs(Checkup it) {
+    final s = (it.observation).trim();
+    return s.isEmpty ? '-' : s;
+  }
+
+  // ✅ Card para móvil
+  Widget _checkupCard(Checkup it) {
+    final id = it.id ?? 0;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // header
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "Chequeo #${id > 0 ? id : '-'}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: "Editar",
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  onPressed: () => _onEdit(it),
+                ),
+                IconButton(
+                  tooltip: "Eliminar",
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  onPressed: () => _onDelete(id),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+
+            _kv("Fecha", it.date),
+            _kv("Síntoma", it.symptom),
+            _kv("Diagnóstico", it.diagnosis),
+            _kv("Tratamiento", it.treatment),
+            _kv("Observación", _safeObs(it)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kv(String k, String v) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(color: Colors.black87),
+          children: [
+            TextSpan(
+              text: "$k: ",
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            TextSpan(text: v),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
+    // ✅ si quieres, cambia el umbral
+    final bool isMobile = width < 700;
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Chequeos - ${widget.cattleName}"),
@@ -206,7 +284,6 @@ class _CheckupTableViewByCattleState extends State<CheckupTableViewByCattle> {
           ),
         ),
         child: Container(
-          // Overlay para legibilidad
           color: Colors.black.withOpacity(0.06),
           child:
               isLoading
@@ -220,23 +297,32 @@ class _CheckupTableViewByCattleState extends State<CheckupTableViewByCattle> {
                           runSpacing: 10,
                           alignment: WrapAlignment.start,
                           children: [
-                            ElevatedButton.icon(
-                              onPressed: _onAdd,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Agregar Chequeo'),
-                              style: _topButtonStyle(Colors.green.shade700),
+                            SizedBox(
+                              width: isMobile ? double.infinity : null,
+                              child: ElevatedButton.icon(
+                                onPressed: _onAdd,
+                                icon: const Icon(Icons.add),
+                                label: const Text('Agregar Chequeo'),
+                                style: _topButtonStyle(Colors.green.shade700),
+                              ),
                             ),
-                            ElevatedButton.icon(
-                              onPressed: _load,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Actualizar'),
-                              style: _topButtonStyle(Colors.green.shade500),
+                            SizedBox(
+                              width: isMobile ? double.infinity : null,
+                              child: ElevatedButton.icon(
+                                onPressed: _load,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Actualizar'),
+                                style: _topButtonStyle(Colors.green.shade500),
+                              ),
                             ),
-                            ElevatedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back),
-                              label: const Text('Regresar'),
-                              style: _topButtonStyle(Colors.teal.shade600),
+                            SizedBox(
+                              width: isMobile ? double.infinity : null,
+                              child: ElevatedButton.icon(
+                                onPressed: () => Navigator.pop(context),
+                                icon: const Icon(Icons.arrow_back),
+                                label: const Text('Regresar'),
+                                style: _topButtonStyle(Colors.teal.shade600),
+                              ),
                             ),
                           ],
                         ),
@@ -260,6 +346,15 @@ class _CheckupTableViewByCattleState extends State<CheckupTableViewByCattle> {
                                       ),
                                     ),
                                   )
+                                  : isMobile
+                                  // ✅ MÓVIL: cards
+                                  ? ListView.builder(
+                                    itemCount: paginatedData.length,
+                                    itemBuilder:
+                                        (_, i) =>
+                                            _checkupCard(paginatedData[i]),
+                                  )
+                                  // ✅ DESKTOP/TABLET: tabla original
                                   : SingleChildScrollView(
                                     controller: _verticalController,
                                     child: SingleChildScrollView(
@@ -305,10 +400,13 @@ class _CheckupTableViewByCattleState extends State<CheckupTableViewByCattle> {
                                           rows:
                                               paginatedData.map((it) {
                                                 final id = it.id ?? 0;
+
                                                 return DataRow(
                                                   cells: [
                                                     DataCell(
-                                                      Text('${it.id ?? '-'}'),
+                                                      Text(
+                                                        id > 0 ? '$id' : '-',
+                                                      ),
                                                     ),
                                                     DataCell(Text(it.date)),
                                                     DataCell(Text(it.symptom)),
@@ -318,8 +416,9 @@ class _CheckupTableViewByCattleState extends State<CheckupTableViewByCattle> {
                                                     DataCell(
                                                       Text(it.treatment),
                                                     ),
+                                                    // ✅ FIX real: observation null-safe
                                                     DataCell(
-                                                      Text(it.observation),
+                                                      Text(_safeObs(it)),
                                                     ),
                                                     DataCell(
                                                       Row(

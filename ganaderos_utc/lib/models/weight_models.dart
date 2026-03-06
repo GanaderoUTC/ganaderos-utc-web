@@ -5,10 +5,15 @@ class Weight {
   final int? id;
   final String date;
   final double weight;
-  final String observation;
+
+  // ✅ opcional
+  final String? observation;
+
   final int cattleId;
   final int companyId;
-  final bool sync;
+
+  // ✅ consistente con el proyecto
+  final int sync;
 
   final Cattle? cattle;
   final Company? company;
@@ -17,52 +22,57 @@ class Weight {
     this.id,
     required this.date,
     required this.weight,
-    required this.observation,
+    this.observation,
     required this.cattleId,
     required this.companyId,
+    required this.sync,
     this.cattle,
     this.company,
-    required this.sync,
   });
 
-  // FROM MAP
   factory Weight.fromMap(Map<String, dynamic> map) {
+    int parseInt(dynamic v) {
+      if (v == null) return 0;
+      if (v is int) return v;
+      if (v is double) return v.toInt();
+      return int.tryParse(v.toString()) ?? 0;
+    }
+
+    double parseDouble(dynamic v) {
+      if (v == null) return 0.0;
+      if (v is double) return v;
+      if (v is int) return v.toDouble();
+      return double.tryParse(v.toString()) ?? 0.0;
+    }
+
     return Weight(
-      id: map['id'],
-      date: map['date'] ?? '',
-      weight:
-          map['weight'] is int
-              ? (map['weight'] as int).toDouble()
-              : double.tryParse(map['weight']?.toString() ?? '0') ?? 0.0,
-      observation: map['observation'] ?? '',
-      cattleId:
-          map['cattle_id'] is int
-              ? map['cattle_id']
-              : int.tryParse(map['cattle_id']?.toString() ?? '0') ?? 0,
-      companyId:
-          map['company_id'] is int
-              ? map['company_id']
-              : int.tryParse(map['company_id']?.toString() ?? '0') ?? 0,
+      id: map['id'] is int ? map['id'] : int.tryParse('${map['id']}'),
+      date: map['date']?.toString() ?? '',
+      weight: parseDouble(map['weight']),
+      observation: map['observation']?.toString(),
+      cattleId: parseInt(map['cattle_id'] ?? map['cattleId']),
+      companyId: parseInt(map['company_id'] ?? map['companyId']),
       cattle: map['cattle'] != null ? Cattle.fromMap(map['cattle']) : null,
       company: map['company'] != null ? Company.fromMap(map['company']) : null,
-      sync: map['sync'] == 1 || map['sync'] == true,
+      sync: map['sync'] is bool ? (map['sync'] ? 1 : 0) : parseInt(map['sync']),
     );
   }
 
-  // TO MAP
   Map<String, dynamic> toMap() {
-    return {
+    final data = {
       'id': id,
       'date': date,
       'weight': weight,
       'observation': observation,
       'cattle_id': cattleId,
       'company_id': companyId,
-      'sync': sync ? 1 : 0,
+      'sync': sync,
     };
+
+    data.removeWhere((k, v) => v == null);
+    return data;
   }
 
-  // COPY WITH (para EDITAR)
   Weight copyWith({
     int? id,
     String? date,
@@ -70,7 +80,7 @@ class Weight {
     String? observation,
     int? cattleId,
     int? companyId,
-    bool? sync,
+    int? sync,
     Cattle? cattle,
     Company? company,
   }) {

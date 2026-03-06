@@ -7,8 +7,14 @@ class DiagnosisRepository {
   // Obtener todos los diagnósticos
   static Future<List<Diagnosis>> getAll() async {
     try {
-      final List<dynamic> dataList = await ApiConnection.get(endpoint);
-      return dataList.map((data) => Diagnosis.fromMap(data)).toList();
+      final dataList = await ApiConnection.get(endpoint);
+
+      // ✅ protección extra por si llega algo raro
+      if (dataList.isEmpty) return [];
+
+      return dataList
+          .map((data) => Diagnosis.fromMap(Map<String, dynamic>.from(data)))
+          .toList();
     } catch (e) {
       print("Error al obtener diagnósticos: $e");
       return [];
@@ -26,16 +32,27 @@ class DiagnosisRepository {
     return null;
   }
 
+  // ---------------------------------------------------------------------------
+  // ✅ helpers internos (sin tocar ApiConnection)
+  // ---------------------------------------------------------------------------
+  static int _asInt(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString().trim()) ?? 0;
+  }
+
   // Actualizar un diagnóstico existente
   static Future<bool> updateDiagnosis(Diagnosis diagnosis) async {
     if (diagnosis.id == null) return false;
     try {
-      final response = await ApiConnection.patch(
+      final result = await ApiConnection.patch(
         '$endpoint/${diagnosis.id}',
         diagnosis.toMap(),
       );
-      // ignore: unnecessary_null_comparison
-      return response != null;
+
+      // ✅ tolerante: si llega int, num o string
+      return _asInt(result) > 0;
     } catch (e) {
       print("Error al actualizar diagnóstico: $e");
       return false;
@@ -45,9 +62,10 @@ class DiagnosisRepository {
   // Eliminar un diagnóstico por ID
   static Future<bool> deleteDiagnosis(int id) async {
     try {
-      final response = await ApiConnection.delete('$endpoint/$id');
-      // ignore: unnecessary_null_comparison
-      return response != null;
+      final result = await ApiConnection.delete('$endpoint/$id');
+
+      // ✅ tolerante: si llega int, num o string
+      return _asInt(result) > 0;
     } catch (e) {
       print("Error al eliminar diagnóstico: $e");
       return false;

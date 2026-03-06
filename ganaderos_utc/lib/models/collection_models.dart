@@ -3,24 +3,37 @@ import 'company_models.dart';
 
 class Collection {
   final int? id;
+
+  /// Recomendado: "YYYY-MM-DD" o ISO string
   final String date;
+
   final double litres;
-  final int? illness;
+
+  /// 1 o 2
+  final int illness;
+
+  /// ✅ NUEVO (o mejorado): descripción del nivel de enfermedad
+  final String? illnessDescription;
+
   final double density;
   final String? observation;
+
   final int cattleId;
   final int companyId;
+
+  /// sync: 1 = sincronizado, 0 = no sincronizado
   final int sync;
 
   // Relaciones
   final Cattle? cattle;
   final Company? company;
 
-  Collection({
+  const Collection({
     this.id,
     required this.date,
     required this.litres,
-    this.illness,
+    required this.illness,
+    this.illnessDescription,
     required this.density,
     this.observation,
     required this.cattleId,
@@ -30,56 +43,148 @@ class Collection {
     this.company,
   });
 
-  // Convertir desde JSON / Map
-  factory Collection.fromMap(Map<String, dynamic> map) {
+  /// ✅ Descripción automática por defecto (si no viene del API)
+  static String defaultIllnessDescription(int illness) {
+    return (illness == 2) ? "Nivel 2 (Alto)" : "Nivel 1 (Bajo)";
+  }
+
+  /// ✅ Para actualizar fácil desde formularios
+  Collection copyWith({
+    int? id,
+    String? date,
+    double? litres,
+    int? illness,
+    String? illnessDescription,
+    double? density,
+    String? observation,
+    int? cattleId,
+    int? companyId,
+    int? sync,
+    Cattle? cattle,
+    Company? company,
+  }) {
+    final newIllness = illness ?? this.illness;
+    final descRaw = illnessDescription ?? this.illnessDescription;
+
     return Collection(
-      id: map['id'],
-      date: map['date']?.toString() ?? '',
-
-      litres:
-          (map['litres'] is int)
-              ? (map['litres'] as int).toDouble()
-              : (map['litres'] ?? 0.0).toDouble(),
-
-      illness:
-          map['illness'] == null
-              ? null
-              : (map['illness'] is int
-                  ? map['illness']
-                  : int.tryParse(map['illness'].toString())),
-
-      density:
-          (map['density'] is int)
-              ? (map['density'] as int).toDouble()
-              : (map['density'] ?? 0.0).toDouble(),
-
-      observation: map['observation']?.toString(),
-
-      // corrección del nombre de claves para IDs
-      cattleId: map['cattle_id'] ?? 0,
-      companyId: map['company_id'] ?? 0,
-
-      // sync normalizado
-      sync: map['sync'] is bool ? (map['sync'] ? 1 : 0) : (map['sync'] ?? 0),
-
-      // Relaciones anidadas
-      cattle: map['cattle'] != null ? Cattle.fromMap(map['cattle']) : null,
-      company: map['company'] != null ? Company.fromMap(map['company']) : null,
+      id: id ?? this.id,
+      date: date ?? this.date,
+      litres: litres ?? this.litres,
+      illness: _normalizeIllness(newIllness),
+      illnessDescription: _normalizeDesc(
+        descRaw,
+        _normalizeIllness(newIllness),
+      ),
+      density: density ?? this.density,
+      observation: observation ?? this.observation,
+      cattleId: cattleId ?? this.cattleId,
+      companyId: companyId ?? this.companyId,
+      sync: sync ?? this.sync,
+      cattle: cattle ?? this.cattle,
+      company: company ?? this.company,
     );
   }
 
-  // Convertir a Map para BD/API
+  factory Collection.fromMap(Map<String, dynamic> map) {
+    final c = map['cattle'];
+    final co = map['company'];
+
+    // illness puede venir como num/string/null
+    final parsedIllness = _asInt(map['illness']) ?? 1;
+    final illnessNorm = _normalizeIllness(parsedIllness);
+
+    // ✅ soporta illnessDescription o illness_description
+    final rawDesc =
+        (map['illnessDescription'] ?? map['illness_description'])?.toString();
+
+    return Collection(
+      id: _asInt(map['id']),
+      date: (map['date'] ?? '').toString().trim(),
+      litres: _asDouble(map['litres']),
+      density: _asDouble(map['density']),
+
+      illness: illnessNorm,
+
+      /// ✅ si no viene descripción, se autocompleta con la del nivel 1/2
+      illnessDescription: _normalizeDesc(rawDesc, illnessNorm),
+
+      observation:
+          (map['observation'] == null)
+              ? null
+              : map['observation'].toString().trim(),
+
+      cattleId: _asInt(map['cattle_id']) ?? 0,
+      companyId: _asInt(map['company_id']) ?? 0,
+      sync: _asIntBool(map['sync']),
+
+      cattle: c is Map ? Cattle.fromMap(Map<String, dynamic>.from(c)) : null,
+      company:
+          co is Map ? Company.fromMap(Map<String, dynamic>.from(co)) : null,
+    );
+  }
+
   Map<String, dynamic> toMap() {
+    final desc = _normalizeDesc(illnessDescription, illness);
+
     return {
       'id': id,
       'date': date,
       'litres': litres,
       'illness': illness,
+
+      /// ✅ manda la descripción (clave camel)
+      'illnessDescription': desc,
+
+      /// ✅ extra: por compatibilidad si tu backend espera snake_case
+      'illness_description': desc,
+
       'density': density,
       'observation': observation,
       'cattle_id': cattleId,
       'company_id': companyId,
       'sync': sync,
     };
+  }
+
+  // ---------------- HELPERS ----------------
+
+  static int _normalizeIllness(int v) {
+    // Solo 1 o 2
+    if (v == 2) return 2;
+    return 1;
+  }
+
+  static String? _normalizeDesc(String? raw, int illness) {
+    final s = (raw ?? '').trim();
+    if (s.isNotEmpty) return s;
+    // Si está vacío, devuelve la descripción por defecto
+    return defaultIllnessDescription(illness);
+  }
+
+  static int? _asInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    return int.tryParse(v.toString().trim());
+  }
+
+  static double _asDouble(dynamic v) {
+    if (v == null) return 0.0;
+    if (v is double) return v;
+    if (v is int) return v.toDouble();
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString().trim()) ?? 0.0;
+  }
+
+  /// Convierte true/false, 1/0, "1"/"0", "true"/"false" a int 1/0
+  static int _asIntBool(dynamic v) {
+    if (v == null) return 0;
+    if (v is int) return v == 1 ? 1 : 0;
+    if (v is num) return v.toInt() == 1 ? 1 : 0;
+    if (v is bool) return v ? 1 : 0;
+
+    final s = v.toString().trim().toLowerCase();
+    if (s == '1' || s == 'true' || s == 'yes' || s == 'si') return 1;
+    return 0;
   }
 }

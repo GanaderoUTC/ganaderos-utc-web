@@ -30,7 +30,6 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
   final ScrollController _horizontalController = ScrollController();
 
   int currentPage = 1;
-  final int rowsPerPage = 10;
 
   @override
   void initState() {
@@ -43,6 +42,12 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
     _verticalController.dispose();
     _horizontalController.dispose();
     super.dispose();
+  }
+
+  // ✅ rows per page responsive
+  int _rowsPerPage(BuildContext context) {
+    final w = MediaQuery.of(context).size.width;
+    return (w < 600) ? 5 : 10;
   }
 
   Future<void> _load() async {
@@ -155,7 +160,9 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
     }
   }
 
-  List<Vaccine> get paginatedData {
+  List<Vaccine> _paginatedData(BuildContext context) {
+    final rowsPerPage = _rowsPerPage(context);
+
     if (list.isEmpty) return [];
     final start = (currentPage - 1) * rowsPerPage;
     if (start >= list.length) return [];
@@ -163,14 +170,19 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
     return list.sublist(start, end > list.length ? list.length : end);
   }
 
-  int get totalPages => list.isEmpty ? 1 : (list.length / rowsPerPage).ceil();
+  int _totalPages(BuildContext context) {
+    final rowsPerPage = _rowsPerPage(context);
+    return list.isEmpty ? 1 : (list.length / rowsPerPage).ceil();
+  }
+
   void goToPage(int page) => setState(() => currentPage = page);
 
-  ButtonStyle _topButtonStyle(Color bg) {
+  ButtonStyle _topButtonStyle(Color bg, {bool fullWidth = false}) {
     return ElevatedButton.styleFrom(
       backgroundColor: bg,
       foregroundColor: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      minimumSize: fullWidth ? const Size.fromHeight(44) : null,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       elevation: 2,
     );
@@ -197,6 +209,10 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
 
   @override
   Widget build(BuildContext context) {
+    final isMobile = MediaQuery.of(context).size.width < 600;
+    final rows = _paginatedData(context);
+    final totalPages = _totalPages(context);
+
     return Scaffold(
       appBar: AppBar(
         title: Text("Vacunas - ${widget.cattleName}"),
@@ -211,7 +227,6 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
           ),
         ),
         child: Container(
-          // Overlay para legibilidad
           color: Colors.black.withOpacity(0.06),
           child:
               isLoading
@@ -220,31 +235,74 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(12),
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          alignment: WrapAlignment.start,
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _onAdd,
-                              icon: const Icon(Icons.add),
-                              label: const Text('Agregar Vacuna'),
-                              style: _topButtonStyle(Colors.green.shade700),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: _load,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Actualizar'),
-                              style: _topButtonStyle(Colors.green.shade500),
-                            ),
-                            ElevatedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(Icons.arrow_back),
-                              label: const Text('Regresar'),
-                              style: _topButtonStyle(Colors.teal.shade600),
-                            ),
-                          ],
-                        ),
+                        child:
+                            isMobile
+                                ? Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _onAdd,
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Agregar Vacuna'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade700,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ElevatedButton.icon(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Actualizar'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade500,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    ElevatedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.arrow_back),
+                                      label: const Text('Regresar'),
+                                      style: _topButtonStyle(
+                                        Colors.teal.shade600,
+                                        fullWidth: true,
+                                      ),
+                                    ),
+                                  ],
+                                )
+                                : Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  alignment: WrapAlignment.start,
+                                  children: [
+                                    ElevatedButton.icon(
+                                      onPressed: _onAdd,
+                                      icon: const Icon(Icons.add),
+                                      label: const Text('Agregar Vacuna'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade700,
+                                      ),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: _load,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Actualizar'),
+                                      style: _topButtonStyle(
+                                        Colors.green.shade500,
+                                      ),
+                                    ),
+                                    ElevatedButton.icon(
+                                      onPressed: () => Navigator.pop(context),
+                                      icon: const Icon(Icons.arrow_back),
+                                      label: const Text('Regresar'),
+                                      style: _topButtonStyle(
+                                        Colors.teal.shade600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                       ),
 
                       Expanded(
@@ -270,80 +328,136 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
                                     child: SingleChildScrollView(
                                       controller: _horizontalController,
                                       scrollDirection: Axis.horizontal,
-                                      child: _tableCard(
-                                        DataTable(
-                                          columnSpacing: 30,
-                                          headingRowColor:
-                                              WidgetStateProperty.all(
-                                                Colors.black.withOpacity(0.85),
-                                              ),
-                                          headingTextStyle: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          dataRowColor:
-                                              WidgetStateProperty.resolveWith(
-                                                (states) =>
-                                                    states.contains(
-                                                          WidgetState.hovered,
-                                                        )
-                                                        ? Colors.grey
-                                                            .withOpacity(0.15)
-                                                        : Colors.white
-                                                            .withOpacity(0.92),
-                                              ),
-                                          columns: const [
-                                            DataColumn(label: Text('ID')),
-                                            DataColumn(label: Text('Fecha')),
-                                            DataColumn(label: Text('Vacuna')),
-                                            DataColumn(
-                                              label: Text('Observación'),
+                                      child: ConstrainedBox(
+                                        // ✅ minWidth ayuda en web móvil
+                                        constraints: BoxConstraints(
+                                          minWidth: isMobile ? 720 : 900,
+                                        ),
+                                        child: _tableCard(
+                                          DataTable(
+                                            columnSpacing: isMobile ? 18 : 30,
+                                            headingRowColor:
+                                                WidgetStateProperty.all(
+                                                  Colors.black.withOpacity(
+                                                    0.85,
+                                                  ),
+                                                ),
+                                            headingTextStyle: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
                                             ),
-                                            DataColumn(label: Text('Acciones')),
-                                          ],
-                                          rows:
-                                              paginatedData.map((it) {
-                                                return DataRow(
-                                                  cells: [
-                                                    DataCell(
-                                                      Text('${it.id ?? '-'}'),
-                                                    ),
-                                                    DataCell(Text(it.date)),
-                                                    DataCell(Text(it.name)),
-                                                    DataCell(
-                                                      Text(it.observation),
-                                                    ),
-                                                    DataCell(
-                                                      Row(
-                                                        children: [
-                                                          IconButton(
-                                                            tooltip: "Editar",
-                                                            icon: const Icon(
-                                                              Icons.edit,
-                                                              color:
-                                                                  Colors.blue,
-                                                            ),
-                                                            onPressed:
-                                                                () =>
-                                                                    _onEdit(it),
-                                                          ),
-                                                          IconButton(
-                                                            tooltip: "Eliminar",
-                                                            icon: const Icon(
-                                                              Icons.delete,
-                                                              color: Colors.red,
-                                                            ),
-                                                            onPressed:
-                                                                () => _onDelete(
-                                                                  it.id ?? 0,
-                                                                ),
-                                                          ),
-                                                        ],
+                                            dataRowColor:
+                                                WidgetStateProperty.resolveWith(
+                                                  (states) =>
+                                                      states.contains(
+                                                            WidgetState.hovered,
+                                                          )
+                                                          ? Colors.grey
+                                                              .withOpacity(0.15)
+                                                          : Colors.white
+                                                              .withOpacity(
+                                                                0.92,
+                                                              ),
+                                                ),
+                                            columns: const [
+                                              DataColumn(label: Text('ID')),
+                                              DataColumn(label: Text('Fecha')),
+                                              DataColumn(label: Text('Vacuna')),
+                                              DataColumn(
+                                                label: Text('Observación'),
+                                              ),
+                                              DataColumn(
+                                                label: Text('Acciones'),
+                                              ),
+                                            ],
+                                            rows:
+                                                rows.map((it) {
+                                                  final id = it.id ?? 0;
+
+                                                  // ✅ FIX: observation puede ser null
+                                                  final obs =
+                                                      (it.observation == null ||
+                                                              it.observation!
+                                                                  .trim()
+                                                                  .isEmpty)
+                                                          ? '-'
+                                                          : it.observation!
+                                                              .trim();
+
+                                                  return DataRow(
+                                                    cells: [
+                                                      DataCell(
+                                                        Text(
+                                                          id > 0 ? '$id' : '-',
+                                                        ),
                                                       ),
-                                                    ),
-                                                  ],
-                                                );
-                                              }).toList(),
+                                                      DataCell(Text(it.date)),
+                                                      DataCell(
+                                                        SizedBox(
+                                                          width:
+                                                              isMobile
+                                                                  ? 160
+                                                                  : 220,
+                                                          child: Text(
+                                                            it.name,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            maxLines: 1,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        SizedBox(
+                                                          width:
+                                                              isMobile
+                                                                  ? 220
+                                                                  : 340,
+                                                          child: Text(
+                                                            obs,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            maxLines: 2,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      DataCell(
+                                                        Row(
+                                                          children: [
+                                                            IconButton(
+                                                              tooltip: "Editar",
+                                                              icon: const Icon(
+                                                                Icons.edit,
+                                                                color:
+                                                                    Colors.blue,
+                                                              ),
+                                                              onPressed:
+                                                                  () => _onEdit(
+                                                                    it,
+                                                                  ),
+                                                            ),
+                                                            IconButton(
+                                                              tooltip:
+                                                                  "Eliminar",
+                                                              icon: const Icon(
+                                                                Icons.delete,
+                                                                color:
+                                                                    Colors.red,
+                                                              ),
+                                                              onPressed:
+                                                                  () =>
+                                                                      _onDelete(
+                                                                        id,
+                                                                      ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                }).toList(),
+                                          ),
                                         ),
                                       ),
                                     ),
