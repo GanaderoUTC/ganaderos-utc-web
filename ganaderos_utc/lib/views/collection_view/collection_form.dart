@@ -64,6 +64,7 @@ class _CollectionFormState extends State<CollectionForm> {
         _companyList = companies;
       });
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al cargar datos de selects: $e");
     }
   }
@@ -148,6 +149,7 @@ class _CollectionFormState extends State<CollectionForm> {
         );
       }
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al guardar: $e");
       if (mounted) {
         ScaffoldMessenger.of(

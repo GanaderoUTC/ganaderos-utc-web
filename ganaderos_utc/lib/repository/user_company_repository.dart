@@ -6,7 +6,6 @@ class UserCompanyRepository {
 
   static Future<List<User>> getAllByCompany(int companyId) async {
     try {
-      // ✅ getList siempre es lista y es coherente con tu ApiConnection
       final List<Map<String, dynamic>> rawList = await ApiConnection.getList(
         "$_basePath?companyId=$companyId",
       );
@@ -16,7 +15,6 @@ class UserCompanyRepository {
               .map((item) => User.fromMap(Map<String, dynamic>.from(item)))
               .toList();
 
-      // ✅ FILTRO FINAL (por si la API NO filtra)
       return parsed.where((u) {
         if (u.companyId != null) return u.companyId == companyId;
         final nestedId = u.company?.id;
@@ -24,6 +22,7 @@ class UserCompanyRepository {
         return false;
       }).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener usuarios por companyId=$companyId: $e");
       return [];
     }
@@ -44,7 +43,6 @@ class UserCompanyRepository {
       final response = await ApiConnection.post(_basePath, payload);
       if (response == null) return null;
 
-      // ✅ normaliza: {data:{...}} o {...}
       final Map<String, dynamic> userMap =
           (response['data'] is Map)
               ? Map<String, dynamic>.from(response['data'])
@@ -53,6 +51,7 @@ class UserCompanyRepository {
       if (userMap.isEmpty) return null;
       return User.fromMap(userMap);
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear usuario: $e");
       return null;
     }
@@ -77,7 +76,6 @@ class UserCompanyRepository {
         payload,
       );
 
-      // ✅ Acepta varias respuestas
       if (response is int) return response > 0;
       if (response is bool) return response;
       if (response is Map &&
@@ -88,10 +86,11 @@ class UserCompanyRepository {
           (response['id'] != null || response['data'] != null)) {
         return true;
       }
-
+      // ignore: avoid_print
       print("⚠️ Respuesta inesperada al actualizar: $response");
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar usuario: $e");
       return false;
     }
@@ -102,10 +101,15 @@ class UserCompanyRepository {
       final dynamic response = await ApiConnection.delete("$_basePath/$id");
 
       if (response is int) return response > 0;
-      if (response is Map && response['success'] == true) return true;
+      if (response is bool) return response;
+      if (response is Map &&
+          (response['success'] == true || response['ok'] == true)) {
+        return true;
+      }
 
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar usuario: $e");
       return false;
     }

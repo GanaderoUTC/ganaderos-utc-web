@@ -11,6 +11,7 @@ class CattleCompanyRepository {
 
       return dataList.map((e) => Cattle.fromMap(e)).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener ganado por empresa: $e");
       return [];
     }
@@ -25,6 +26,7 @@ class CattleCompanyRepository {
         return Cattle.fromMap(response);
       }
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear ganado para empresa: $e");
     }
     return null;
@@ -42,6 +44,7 @@ class CattleCompanyRepository {
 
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar ganado de empresa: $e");
       return false;
     }
@@ -53,6 +56,7 @@ class CattleCompanyRepository {
       final result = await ApiConnection.delete("/cattle/$id");
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar ganado de empresa: $e");
       return false;
     }

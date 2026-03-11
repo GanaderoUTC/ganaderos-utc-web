@@ -17,9 +17,7 @@ class _BreedFormState extends State<BreedForm> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
 
-  /// sync int (1/0) en modelo, bool en UI
   bool _syncBool = false;
-
   bool _saving = false;
 
   final _repository = BreedsRepository();
@@ -28,8 +26,8 @@ class _BreedFormState extends State<BreedForm> {
   void initState() {
     super.initState();
     if (widget.breed != null) {
-      _nameController.text = widget.breed!.name;
-      _descriptionController.text = widget.breed!.description;
+      _nameController.text = _capitalizeFirst(widget.breed!.name);
+      _descriptionController.text = _capitalizeFirst(widget.breed!.description);
       _syncBool = widget.breed!.sync == 1;
     }
   }
@@ -41,24 +39,72 @@ class _BreedFormState extends State<BreedForm> {
     super.dispose();
   }
 
+  /// Primera letra mayúscula y el resto minúscula
+  String _capitalizeFirst(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
+  }
+
+  /// Normaliza para comparar duplicados
+  String _normalizeForCompare(String text) {
+    return text.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  }
+
   String? _validateName(String? value) {
     if (value == null) return 'El nombre es obligatorio';
     final s = value.trim();
+
     if (s.isEmpty) return 'El nombre es obligatorio';
     if (s.length < 2) return 'Nombre muy corto';
     if (s.length > 60) return 'Nombre muy largo (máx. 60)';
 
     final ok = RegExp(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 '._-]{2,60}$").hasMatch(s);
     if (!ok) return 'Nombre inválido';
+
     return null;
   }
 
   String? _validateDescription(String? value) {
     if (value == null) return null;
     final s = value.trim();
+
     if (s.isEmpty) return null;
     if (s.length > 250) return 'Descripción muy larga (máx. 250)';
+
     return null;
+  }
+
+  Future<bool> _isDuplicateName(String name) async {
+    final breeds = await BreedsRepository.getAll();
+    final newName = _normalizeForCompare(name);
+
+    for (final breed in breeds) {
+      final sameId = widget.breed?.id != null && breed.id == widget.breed!.id;
+      if (sameId) continue;
+
+      if (_normalizeForCompare(breed.name) == newName) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _isDuplicateDescription(String description) async {
+    if (description.trim().isEmpty) return false;
+
+    final breeds = await BreedsRepository.getAll();
+    final newDescription = _normalizeForCompare(description);
+
+    for (final breed in breeds) {
+      final sameId = widget.breed?.id != null && breed.id == widget.breed!.id;
+      if (sameId) continue;
+
+      if (_normalizeForCompare(breed.description) == newDescription) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Future<void> _saveForm() async {
@@ -70,14 +116,47 @@ class _BreedFormState extends State<BreedForm> {
 
     setState(() => _saving = true);
 
-    final newBreed = Breed(
-      id: widget.breed?.id,
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim(),
-      sync: _syncBool ? 1 : 0,
-    );
-
     try {
+      final formattedName = _capitalizeFirst(_nameController.text);
+      final formattedDescription = _capitalizeFirst(
+        _descriptionController.text,
+      );
+
+      final existsName = await _isDuplicateName(formattedName);
+      if (existsName) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ya existe una raza con ese nombre'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+
+      final existsDescription = await _isDuplicateDescription(
+        formattedDescription,
+      );
+      if (existsDescription) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ya existe una raza con esa descripción'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+
+      final newBreed = Breed(
+        id: widget.breed?.id,
+        name: formattedName,
+        description: formattedDescription,
+        sync: _syncBool ? 1 : 0,
+      );
+
       if (widget.breed == null) {
         await _repository.insertBreed(newBreed);
       } else {
@@ -117,7 +196,6 @@ class _BreedFormState extends State<BreedForm> {
 
     final size = MediaQuery.of(context).size;
     final isMobile = size.width < 700;
-
     final double dialogMaxWidth = isMobile ? size.width * 0.92 : 520;
 
     return AlertDialog(

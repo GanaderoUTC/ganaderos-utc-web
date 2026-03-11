@@ -6,7 +6,7 @@ import '../../../repositories/cattle_repository.dart';
 
 class CheckupCattleForm extends StatefulWidget {
   final Checkup? checkup;
-  final int cattleId; // ganado FIJO
+  final int cattleId;
   final VoidCallback onSave;
 
   const CheckupCattleForm({
@@ -35,9 +35,6 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
   bool _isLoading = false;
   bool get _isEditing => widget.checkup != null;
 
-  // ------------------------------------------------------------
-  // INIT
-  // ------------------------------------------------------------
   @override
   void initState() {
     super.initState();
@@ -47,15 +44,22 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
 
   void _fillForm(Checkup c) {
     _dateController.text = c.date;
-    _symptomController.text = c.symptom;
-    _diagnosisController.text = c.diagnosis;
-    _treatmentController.text = c.treatment;
-    _observationController.text = c.observation;
+    _symptomController.text = _capitalizeFirst(c.symptom);
+    _diagnosisController.text = _capitalizeFirst(c.diagnosis);
+    _treatmentController.text = _capitalizeFirst(c.treatment);
+    _observationController.text = _capitalizeFirst(c.observation);
   }
 
-  // ------------------------------------------------------------
-  // SOLO CARGA EL GANADO ACTUAL (no todo el sistema)
-  // ------------------------------------------------------------
+  String _capitalizeFirst(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
+  }
+
+  String _normalizeForCompare(String text) {
+    return text.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  }
+
   Future<void> _loadCattle() async {
     try {
       final cattle = await CattleRepository.getAll();
@@ -80,9 +84,6 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
     }
   }
 
-  // ------------------------------------------------------------
-  // DATE PICKER
-  // ------------------------------------------------------------
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -100,9 +101,6 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
     }
   }
 
-  // ------------------------------------------------------------
-  // VALIDADOR TEXTO
-  // ------------------------------------------------------------
   String? _textMin(
     String? v, {
     int min = 3,
@@ -116,10 +114,59 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
     return null;
   }
 
-  // ------------------------------------------------------------
-  // GUARDAR
-  // ------------------------------------------------------------
+  Future<List<Checkup>> _getExistingCheckups() async {
+    try {
+      final data = await CheckupCattleRepository.getAllByCattle(
+        widget.cattleId,
+      );
+      return data;
+    } catch (e) {
+      debugPrint("❌ Error al consultar chequeos existentes: $e");
+      return [];
+    }
+  }
+
+  Future<bool> _isDuplicateCheckup({
+    required String date,
+    required String symptom,
+    required String diagnosis,
+    required String treatment,
+  }) async {
+    final checkups = await _getExistingCheckups();
+
+    final newDate = date.trim();
+    final newSymptom = _normalizeForCompare(symptom);
+    final newDiagnosis = _normalizeForCompare(diagnosis);
+    final newTreatment = _normalizeForCompare(treatment);
+
+    for (final item in checkups) {
+      final sameId =
+          widget.checkup?.id != null && item.id == widget.checkup!.id;
+      if (sameId) continue;
+
+      final itemDate = item.date.trim();
+      final itemSymptom = _normalizeForCompare(item.symptom);
+      final itemDiagnosis = _normalizeForCompare(item.diagnosis);
+      final itemTreatment = _normalizeForCompare(item.treatment);
+
+      final sameDate = itemDate == newDate;
+      final sameSymptom = itemSymptom == newSymptom;
+      final sameDiagnosis = itemDiagnosis == newDiagnosis;
+      final sameTreatment = itemTreatment == newTreatment;
+
+      if (sameDate || sameSymptom || sameDiagnosis || sameTreatment) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   Future<void> _saveForm() async {
+    if (_isLoading) return;
+
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCattle == null) {
@@ -137,13 +184,42 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
     setState(() => _isLoading = true);
 
     try {
+      final formattedSymptom = _capitalizeFirst(_symptomController.text);
+      final formattedDiagnosis = _capitalizeFirst(_diagnosisController.text);
+      final formattedTreatment = _capitalizeFirst(_treatmentController.text);
+      final formattedObservation =
+          _observationController.text.trim().isEmpty
+              ? ''
+              : _capitalizeFirst(_observationController.text);
+
+      final existsDuplicate = await _isDuplicateCheckup(
+        date: _dateController.text.trim(),
+        symptom: formattedSymptom,
+        diagnosis: formattedDiagnosis,
+        treatment: formattedTreatment,
+      );
+
+      if (existsDuplicate) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              "Ya existe un chequeo con la misma fecha, síntoma, diagnóstico o tratamiento",
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
       final checkup = Checkup(
         id: widget.checkup?.id,
         date: _dateController.text.trim(),
-        symptom: _symptomController.text.trim(),
-        diagnosis: _diagnosisController.text.trim(),
-        treatment: _treatmentController.text.trim(),
-        observation: _observationController.text.trim(),
+        symptom: formattedSymptom,
+        diagnosis: formattedDiagnosis,
+        treatment: formattedTreatment,
+        observation: formattedObservation,
         cattleId: widget.cattleId,
         companyId: companyId,
         sync: 1,
@@ -160,33 +236,37 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
       if (!mounted) return;
 
       if (ok) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isEditing
+                  ? "Chequeo actualizado correctamente"
+                  : "Chequeo guardado correctamente",
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
         widget.onSave();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-              const SnackBar(content: Text("Chequeo guardado correctamente")),
-            )
-            .closed
-            .then((_) {
-              if (mounted) Navigator.pop(context);
-            });
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("No se pudo guardar el chequeo")),
+          const SnackBar(
+            content: Text("No se pudo guardar el chequeo"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       debugPrint("❌ Error al guardar chequeo: $e");
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // ------------------------------------------------------------
-  // DISPOSE
-  // ------------------------------------------------------------
   @override
   void dispose() {
     _dateController.dispose();
@@ -197,20 +277,32 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
     super.dispose();
   }
 
-  // ------------------------------------------------------------
-  // UI
-  // ------------------------------------------------------------
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isMobile = size.width < 700;
+    final dialogWidth = isMobile ? size.width * 0.92 : 500.0;
+
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 24,
+        vertical: 16,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      title: Text(_isEditing ? 'Editar Chequeo' : 'Agregar Chequeo'),
+      title: Text(
+        _isEditing ? 'Editar Chequeo' : 'Agregar Chequeo',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF2C3E50),
+        ),
+      ),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: SizedBox(
-            width: 500,
+            width: dialogWidth,
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 _buildField(
                   _dateController,
@@ -220,7 +312,7 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
                   onTap: _pickDate,
                   validator:
                       (v) =>
-                          v == null || v.isEmpty
+                          v == null || v.trim().isEmpty
                               ? "Seleccione una fecha"
                               : null,
                 ),
@@ -249,7 +341,7 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
                 ),
                 _buildField(
                   _observationController,
-                  'Observación',
+                  'Observación (Opcional)',
                   Icons.note_alt,
                   required: false,
                   validator: (v) {
@@ -261,8 +353,6 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
                   },
                 ),
                 const SizedBox(height: 12),
-
-                // Ganado fijo
                 DropdownButtonFormField<Cattle>(
                   value: _selectedCattle,
                   hint: const Text("Ganado no encontrado"),
@@ -292,19 +382,39 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.red,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           child: const Text('Cancelar'),
         ),
         ElevatedButton.icon(
           onPressed: _isLoading ? null : _saveForm,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           icon:
               _isLoading
                   ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                   : const Icon(Icons.save),
           label: Text(_isEditing ? 'Actualizar' : 'Guardar'),
@@ -336,7 +446,8 @@ class _CheckupCattleFormState extends State<CheckupCattleForm> {
         validator:
             validator ??
             (required
-                ? (v) => v == null || v.isEmpty ? 'Campo requerido' : null
+                ? (v) =>
+                    v == null || v.trim().isEmpty ? 'Campo requerido' : null
                 : null),
       ),
     );

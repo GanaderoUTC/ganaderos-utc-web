@@ -23,6 +23,7 @@ class CheckupCattleRepository {
 
       return filtered;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener chequeos por cattleId=$cattleId: $e");
       return [];
     }
@@ -49,6 +50,7 @@ class CheckupCattleRepository {
 
       return null;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear chequeo: $e");
       return null;
     }
@@ -71,6 +73,7 @@ class CheckupCattleRepository {
 
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar chequeo: $e");
       return false;
     }
@@ -82,6 +85,7 @@ class CheckupCattleRepository {
       final int result = await ApiConnection.delete("$_basePath/$id");
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar chequeo: $e");
       return false;
     }

@@ -23,7 +23,12 @@ class Category {
   }
 
   Map<String, dynamic> toMap() {
-    return {'id': id, 'name': name, 'description': description, 'sync': sync};
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'sync': sync == 1, // ✅ se envía como bool
+    };
   }
 
   factory Category.fromMap(Map<String, dynamic> data) {

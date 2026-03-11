@@ -47,17 +47,23 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
     _init();
 
     if (_isEditing) {
-      _dateController.text = widget.vaccine!.date;
-      _nameController.text = widget.vaccine!.name;
-
-      // ✅ Cambio mínimo: no uses toString aquí
-      _observationController.text = widget.vaccine!.observation!;
-
-      // Por si algo raro llega como 'null' (defensa extra)
-      if (_observationController.text.trim() == 'null') {
-        _observationController.text = '';
-      }
+      _dateController.text = widget.vaccine?.date ?? '';
+      _nameController.text = _capitalizeFirst(widget.vaccine?.name ?? '');
+      _observationController.text = _capitalizeFirst(
+        widget.vaccine?.observation ?? '',
+      );
     }
+  }
+
+  String _capitalizeFirst(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return '';
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
+  }
+
+  // ignore: unused_element
+  String _normalizeForCompare(String text) {
+    return text.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
   }
 
   Future<void> _init() async {
@@ -65,7 +71,6 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
     setState(() => _loading = true);
 
     try {
-      // ✅ Empresa fija (evitar crash)
       final companies = await CompanyRepository().getAll();
       Company? company;
       for (final c in companies) {
@@ -75,7 +80,6 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
         }
       }
 
-      // ✅ Ganado fijo solo de esa empresa (evitar crash)
       final cattleList = await CattleCompanyRepository.getAllByCompany(
         widget.companyId,
       );
@@ -95,7 +99,6 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
         _loading = false;
       });
 
-      // ✅ Mensajes si algo no existe
       if (company == null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -103,6 +106,7 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
           ),
         );
       }
+
       if (cattle == null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -139,22 +143,56 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
   String? _validateVaccineName(String? v) {
     if (v == null || v.trim().isEmpty) return 'Campo requerido';
     final s = v.trim();
+
     if (s.length < 2) return 'Nombre muy corto';
     if (s.length > 80) return 'Nombre muy largo';
+
     if (!RegExp(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9 .,'-]{2,80}$").hasMatch(s)) {
       return 'Nombre inválido';
     }
+
     return null;
   }
 
   String? _validateObservation(String? v) {
-    if (v == null || v.trim().isEmpty) return null; // opcional
+    if (v == null || v.trim().isEmpty) return null;
     final s = v.trim();
+
     if (s.length > 250) return 'Observación muy larga (máx. 250)';
     return null;
   }
 
+  Future<bool> _isDuplicateDate(String date) async {
+    try {
+      final vaccines = await VaccineCompanyRepository.getAllByCattle(
+        widget.cattleId,
+      );
+
+      final newDate = date.trim();
+
+      for (final vaccine in vaccines) {
+        final sameId =
+            widget.vaccine?.id != null && vaccine.id == widget.vaccine!.id;
+
+        if (sameId) continue;
+
+        if ((vaccine.date).trim() == newDate) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      debugPrint("Error validando fecha duplicada: $e");
+      return false;
+    }
+  }
+
   Future<void> _saveForm() async {
+    if (_saving) return;
+
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_company == null ||
@@ -162,7 +200,10 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
         _cattle!.id == null ||
         _company!.id == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("No se pudo determinar empresa/ganado.")),
+        const SnackBar(
+          content: Text("No se pudo determinar empresa o ganado."),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -170,19 +211,33 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
     setState(() => _saving = true);
 
     try {
+      final formattedName = _capitalizeFirst(_nameController.text);
+      final formattedObservation = _capitalizeFirst(
+        _observationController.text,
+      );
+      final selectedDate = _dateController.text.trim();
+
+      final existsDate = await _isDuplicateDate(selectedDate);
+      if (existsDate) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Ya existe una vacuna registrada en esa fecha"),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+
       final vaccine = Vaccine(
         id: widget.vaccine?.id,
-        date: _dateController.text.trim(),
-        name: _nameController.text.trim(),
-
-        // ✅ limpia observación: si está vacía, manda ''
-        observation: _observationController.text.trim(),
-
+        date: selectedDate,
+        name: formattedName,
+        observation: formattedObservation,
         cattleId: _cattle!.id!,
         companyId: _company!.id!,
-
-        // ✅ recomendado: consistencia con el resto de forms
-        sync: 0, // o false si tu API lo usa al revés
+        sync: 0,
       );
 
       bool ok = false;
@@ -196,25 +251,32 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
       if (!mounted) return;
 
       if (ok) {
-        widget.onSave();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-              const SnackBar(content: Text("Vacuna guardada correctamente")),
-            )
-            .closed
-            .then((_) {
-              if (mounted) Navigator.pop(context);
-            });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isEditing
+                  ? "Vacuna actualizada correctamente"
+                  : "Vacuna guardada correctamente",
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        widget.onSave(); // refresca automáticamente la vista padre
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("No se pudo guardar la vacuna")),
+          const SnackBar(
+            content: Text("No se pudo guardar la vacuna"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -232,7 +294,13 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      title: Text(_isEditing ? 'Editar Vacuna' : 'Agregar Vacuna'),
+      title: Text(
+        _isEditing ? 'Editar Vacuna' : 'Agregar Vacuna',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF2C3E50),
+        ),
+      ),
       content:
           _loading
               ? const SizedBox(
@@ -257,7 +325,6 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
                           ),
                         ),
                         const SizedBox(height: 12),
-
                         TextFormField(
                           initialValue:
                               "${_cattle?.code ?? '-'} - ${_cattle?.name ?? '---'}",
@@ -269,7 +336,6 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
                           ),
                         ),
                         const SizedBox(height: 12),
-
                         _buildField(
                           _dateController,
                           'Fecha de aplicación',
@@ -304,16 +370,35 @@ class _VaccineCompanyFormState extends State<VaccineCompanyForm> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.red,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           child: const Text('Cancelar'),
         ),
         ElevatedButton.icon(
           onPressed: _saving ? null : _saveForm,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           icon:
               _saving
                   ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                   : const Icon(Icons.save),
           label: Text(_isEditing ? 'Actualizar' : 'Guardar'),

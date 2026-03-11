@@ -28,6 +28,7 @@ class WeightCompanyRepository {
         return false;
       }).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener pesos por cattleId=$cattleId: $e");
       return [];
     }
@@ -47,10 +48,11 @@ class WeightCompanyRepository {
       if (response != null) {
         return Weight.fromMap(Map<String, dynamic>.from(response));
       }
-
+      // ignore: avoid_print
       print("⚠️ Respuesta inesperada al crear peso: $response");
       return null;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear peso: $e");
       return null;
     }
@@ -69,10 +71,11 @@ class WeightCompanyRepository {
       if (response is int) return response > 0;
       if (response is Map && response['success'] == true) return true;
       if (response is Map && response['id'] != null) return true;
-
+      // ignore: avoid_print
       print("⚠️ Respuesta inesperada al actualizar peso: $response");
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar peso: $e");
       return false;
     }
@@ -88,6 +91,7 @@ class WeightCompanyRepository {
 
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar peso: $e");
       return false;
     }

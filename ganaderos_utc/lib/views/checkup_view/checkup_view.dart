@@ -51,12 +51,17 @@ class _CheckupViewState extends State<CheckupView> {
             children: [
               // 🔹 Encabezado principal
               const Text(
-                'Gestión de Chequeos',
+                'Gestión de chequeos veterinarios',
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF2C3E50),
+                  color: Color(0xFF1F2937),
                 ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Administre los chequeos registrados por ganado y hacienda.',
+                style: TextStyle(fontSize: 13, color: Colors.grey.shade700),
               ),
 
               const SizedBox(height: 16),

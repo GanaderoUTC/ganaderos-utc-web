@@ -27,8 +27,8 @@ class _CategoryFormState extends State<CategoryForm> {
     super.initState();
     final c = widget.category;
     if (c != null) {
-      _nameController.text = c.name;
-      _descriptionController.text = c.description;
+      _nameController.text = _capitalizeFirst(c.name);
+      _descriptionController.text = _capitalizeFirst(c.description);
       _syncBool = c.sync == 1;
     }
   }
@@ -38,6 +38,18 @@ class _CategoryFormState extends State<CategoryForm> {
     _nameController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  /// Primera letra mayúscula y el resto minúscula
+  String _capitalizeFirst(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
+  }
+
+  /// Normaliza para comparar duplicados
+  String _normalizeForCompare(String text) {
+    return text.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
   }
 
   String? _validateName(String? value) {
@@ -57,22 +69,92 @@ class _CategoryFormState extends State<CategoryForm> {
     return null;
   }
 
+  Future<bool> _isDuplicateName(String name) async {
+    final categories = await CategoriesRepository.getAll();
+    final newName = _normalizeForCompare(name);
+
+    for (final category in categories) {
+      final sameId =
+          widget.category?.id != null && category.id == widget.category!.id;
+      if (sameId) continue;
+
+      if (_normalizeForCompare(category.name) == newName) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _isDuplicateDescription(String description) async {
+    if (description.trim().isEmpty) return false;
+
+    final categories = await CategoriesRepository.getAll();
+    final newDescription = _normalizeForCompare(description);
+
+    for (final category in categories) {
+      final sameId =
+          widget.category?.id != null && category.id == widget.category!.id;
+      if (sameId) continue;
+
+      if (_normalizeForCompare(category.description) == newDescription) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _saveForm() async {
     if (_saving) return;
+
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
 
     final messenger = ScaffoldMessenger.of(context);
 
-    final category = Category(
-      id: widget.category?.id,
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim(),
-      sync: _syncBool ? 1 : 0,
-    );
-
     try {
+      final formattedName = _capitalizeFirst(_nameController.text);
+      final formattedDescription = _capitalizeFirst(
+        _descriptionController.text,
+      );
+
+      final existsName = await _isDuplicateName(formattedName);
+      if (existsName) {
+        if (!mounted) return;
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('Ya existe una categoría con ese nombre'),
+            backgroundColor: Colors.orange.shade700,
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+
+      final existsDescription = await _isDuplicateDescription(
+        formattedDescription,
+      );
+      if (existsDescription) {
+        if (!mounted) return;
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text('Ya existe una categoría con esa descripción'),
+            backgroundColor: Colors.orange.shade700,
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+
+      final category = Category(
+        id: widget.category?.id,
+        name: formattedName,
+        description: formattedDescription,
+        sync: _syncBool ? 1 : 0,
+      );
+
       if (widget.category == null) {
         await _repository.create(category);
       } else {
@@ -81,11 +163,8 @@ class _CategoryFormState extends State<CategoryForm> {
 
       if (!mounted) return;
 
-      // ✅ IMPORTANTE: NO hacer Navigator.pop() aquí (evita doble pop)
-      // Tu view ya cierra el dialog dentro de onSave (Navigator.pop(context, true))
       widget.onSave();
 
-      // ✅ Snackbar luego del pop: programado al siguiente frame
       WidgetsBinding.instance.addPostFrameCallback((_) {
         messenger.showSnackBar(
           SnackBar(
@@ -121,7 +200,7 @@ class _CategoryFormState extends State<CategoryForm> {
         final h = constraints.maxHeight;
 
         final bool isMobile = w < 600;
-        final bool isShortHeight = h < 650; // landscape / teclado
+        final bool isShortHeight = h < 650;
 
         return AlertDialog(
           insetPadding: EdgeInsets.symmetric(
@@ -140,7 +219,6 @@ class _CategoryFormState extends State<CategoryForm> {
           ),
           content: ConstrainedBox(
             constraints: BoxConstraints(
-              // ✅ En móvil web: usa casi todo el alto disponible
               maxHeight: isMobile ? (isShortHeight ? h * 0.75 : h * 0.65) : 420,
               maxWidth: isMobile ? double.infinity : 440,
             ),
@@ -177,7 +255,10 @@ class _CategoryFormState extends State<CategoryForm> {
                       title: const Text('Sincronizado'),
                       value: _syncBool,
                       onChanged:
-                          (value) => setState(() => _syncBool = value ?? false),
+                          _saving
+                              ? null
+                              : (value) =>
+                                  setState(() => _syncBool = value ?? false),
                       activeColor: Colors.green.shade700,
                       controlAffinity: ListTileControlAffinity.leading,
                       contentPadding: EdgeInsets.zero,
@@ -191,7 +272,6 @@ class _CategoryFormState extends State<CategoryForm> {
           actions:
               isMobile
                   ? [
-                    // ✅ Botones full width en móvil web
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(

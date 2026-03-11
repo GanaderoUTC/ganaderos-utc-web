@@ -13,6 +13,7 @@ class WeightRepository {
 
       return dataList.map((data) => Weight.fromMap(data)).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener registros de peso: $e");
       return [];
     }
@@ -27,6 +28,7 @@ class WeightRepository {
         return Weight.fromMap(response);
       }
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear registro de peso: $e");
     }
     return null;
@@ -44,6 +46,7 @@ class WeightRepository {
 
       return result > 0; // ✅ correcto con tu ApiConnection
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar registro de peso: $e");
       return false;
     }
@@ -55,6 +58,7 @@ class WeightRepository {
       final int result = (await ApiConnection.delete('$_basePath/$id'));
       return result > 0; // ✅ correcto con tu ApiConnection
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar registro de peso: $e");
       return false;
     }

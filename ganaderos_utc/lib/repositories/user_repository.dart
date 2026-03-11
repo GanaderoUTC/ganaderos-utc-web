@@ -17,12 +17,22 @@ class UserRepository {
   // ---------------------------
   static Future<User?> login(String username, String password) async {
     try {
+      final cleanUsername = username.trim();
+      final cleanPassword = password.trim();
+
+      if (cleanUsername.isEmpty || cleanPassword.isEmpty) {
+        // ignore: avoid_print
+        print("❌ Usuario y contraseña son obligatorios.");
+        return null;
+      }
+
       final response = await ApiConnection.post(endpointLogin, {
-        "username": username.trim(),
-        "password": password,
+        "username": cleanUsername,
+        "password": cleanPassword,
       });
 
       if (response == null) {
+        // ignore: avoid_print
         print("❌ Error: API no respondió.");
         return null;
       }
@@ -41,6 +51,7 @@ class UserRepository {
       }
 
       if (!userMap.containsKey("id")) {
+        // ignore: avoid_print
         print("❌ Credenciales incorrectas / respuesta sin id.");
         return null;
       }
@@ -49,10 +60,11 @@ class UserRepository {
 
       await storageSave("isLoggedIn", "true");
       await storageSave("user", jsonEncode(userMap));
-
+      // ignore: avoid_print
       print("✅ Login exitoso");
       return user;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error en login: $e");
       return null;
     }
@@ -102,13 +114,14 @@ class UserRepository {
           .map((e) => User.fromMap(Map<String, dynamic>.from(e)))
           .toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener usuarios: $e");
       return [];
     }
   }
 
   // ---------------------------
-  // CREAR USUARIO (ADMIN)  POST /users
+  // CREAR USUARIO  POST /users
   // ---------------------------
   Future<User?> create(User user, {bool includePassword = true}) async {
     try {
@@ -131,6 +144,7 @@ class UserRepository {
       if (userMap.isEmpty) return null;
       return User.fromMap(userMap);
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear usuario: $e");
       return null;
     }
@@ -164,6 +178,7 @@ class UserRepository {
 
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar usuario: $e");
       return false;
     }
@@ -186,6 +201,7 @@ class UserRepository {
 
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar usuario: $e");
       return false;
     }
@@ -212,14 +228,5 @@ class UserRepository {
   static Future<void> logout() async {
     await storageRemove("isLoggedIn");
     await storageRemove("user");
-  }
-
-  // ---------------------------
-  // EXTRA: validar "1 admin por empresa" (front)
-  // (NO reemplaza backend)
-  // ---------------------------
-  static Future<bool> companyHasAdmin(int companyId) async {
-    final users = await getAll();
-    return users.any((u) => u.companyId == companyId && u.role == 'admin');
   }
 }

@@ -1,4 +1,5 @@
 // ignore_for_file: file_names
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../models/collection_models.dart';
 import '../../../repository/collection_company_repository.dart';
@@ -175,18 +176,17 @@ class _CollectionTableViewByCattleState
   Widget _tableCard(Widget child) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.82),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
+        color: Colors.white.withOpacity(0.85),
+        borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
-            blurRadius: 14,
+            color: Colors.black.withOpacity(0.20),
+            blurRadius: 18,
             offset: const Offset(0, 8),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       child: child,
     );
   }
@@ -203,12 +203,12 @@ class _CollectionTableViewByCattleState
     return '$v';
   }
 
-  // ✅ Card para móvil
   Widget _collectionCard(Collection it) {
     final id = it.id ?? 0;
 
     return Card(
       elevation: 2,
+      color: Colors.white.withOpacity(0.92),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -271,246 +271,216 @@ class _CollectionTableViewByCattleState
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final bool isMobile = width < 700; // umbral ajustable
+    final bool isMobile = width < 700;
 
     return Scaffold(
       appBar: AppBar(
         title: Text("Recolección - ${widget.cattleName}"),
         backgroundColor: Colors.green[700],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/fondo_general_2.jpg'),
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/fondo_general_2.jpg',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
           ),
-        ),
-        child: Container(
-          color: Colors.black.withOpacity(0.06),
-          child:
-              isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          alignment: WrapAlignment.start,
-                          children: [
-                            SizedBox(
-                              width: isMobile ? double.infinity : null,
-                              child: ElevatedButton.icon(
-                                onPressed: _onAdd,
-                                icon: const Icon(Icons.add),
-                                label: const Text('Agregar Recolección'),
-                                style: _topButtonStyle(Colors.green.shade700),
-                              ),
-                            ),
-                            SizedBox(
-                              width: isMobile ? double.infinity : null,
-                              child: ElevatedButton.icon(
-                                onPressed: _load,
-                                icon: const Icon(Icons.refresh),
-                                label: const Text('Actualizar'),
-                                style: _topButtonStyle(Colors.green.shade500),
-                              ),
-                            ),
-                            SizedBox(
-                              width: isMobile ? double.infinity : null,
-                              child: ElevatedButton.icon(
-                                onPressed: () => Navigator.pop(context),
-                                icon: const Icon(Icons.arrow_back),
-                                label: const Text('Regresar'),
-                                style: _topButtonStyle(Colors.teal.shade600),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
 
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          child:
-                              list.isEmpty
-                                  ? _tableCard(
-                                    const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: Text(
-                                          "No hay recolecciones registradas",
-                                        ),
-                                      ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.28)),
+          ),
+
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 3.5, sigmaY: 3.5),
+              child: Container(color: Colors.transparent),
+            ),
+          ),
+
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 14),
+
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _onAdd,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar Recolección'),
+                      style: _topButtonStyle(Colors.green.shade700),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Actualizar'),
+                      style: _topButtonStyle(Colors.green.shade500),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Regresar'),
+                      style: _topButtonStyle(Colors.teal.shade600),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 16),
+
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child:
+                        isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : list.isEmpty
+                            ? _tableCard(
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    "No hay recolecciones registradas",
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1E2A35),
                                     ),
-                                  )
-                                  : isMobile
-                                  // ✅ MÓVIL: cards
-                                  ? ListView.builder(
-                                    itemCount: paginatedData.length,
-                                    itemBuilder:
-                                        (_, i) =>
-                                            _collectionCard(paginatedData[i]),
-                                  )
-                                  // ✅ DESKTOP/TABLET: tabla
-                                  : SingleChildScrollView(
-                                    controller: _verticalController,
-                                    child: SingleChildScrollView(
-                                      controller: _horizontalController,
-                                      scrollDirection: Axis.horizontal,
-                                      child: _tableCard(
-                                        DataTable(
-                                          columnSpacing: 30,
-                                          headingRowColor:
-                                              WidgetStateProperty.all(
-                                                Colors.black.withOpacity(0.85),
+                                  ),
+                                ),
+                              ),
+                            )
+                            : isMobile
+                            ? ListView.builder(
+                              itemCount: paginatedData.length,
+                              itemBuilder:
+                                  (_, i) => _collectionCard(paginatedData[i]),
+                            )
+                            : _tableCard(
+                              SingleChildScrollView(
+                                controller: _verticalController,
+                                child: SingleChildScrollView(
+                                  controller: _horizontalController,
+                                  scrollDirection: Axis.horizontal,
+                                  child: DataTable(
+                                    columnSpacing: 30,
+                                    headingRowColor: WidgetStateProperty.all(
+                                      Colors.black.withOpacity(0.9),
+                                    ),
+                                    headingTextStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    columns: const [
+                                      DataColumn(label: Text('ID')),
+                                      DataColumn(label: Text('Fecha')),
+                                      DataColumn(label: Text('Litros')),
+                                      DataColumn(label: Text('Enfermedad')),
+                                      DataColumn(label: Text('Densidad')),
+                                      DataColumn(label: Text('Observación')),
+                                      DataColumn(label: Text('Acciones')),
+                                    ],
+                                    rows:
+                                        paginatedData.map((it) {
+                                          final id = it.id ?? 0;
+
+                                          return DataRow(
+                                            cells: [
+                                              DataCell(
+                                                Text(id > 0 ? '$id' : '-'),
                                               ),
-                                          headingTextStyle: const TextStyle(
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          dataRowColor:
-                                              WidgetStateProperty.resolveWith(
-                                                (states) =>
-                                                    states.contains(
-                                                          WidgetState.hovered,
-                                                        )
-                                                        ? Colors.grey
-                                                            .withOpacity(0.15)
-                                                        : Colors.white
-                                                            .withOpacity(0.92),
+                                              DataCell(Text(it.date)),
+                                              DataCell(
+                                                Text(
+                                                  it.litres.toStringAsFixed(2),
+                                                ),
                                               ),
-                                          columns: const [
-                                            DataColumn(label: Text('ID')),
-                                            DataColumn(label: Text('Fecha')),
-                                            DataColumn(label: Text('Litros')),
-                                            DataColumn(
-                                              label: Text('Enfermedad'),
-                                            ),
-                                            DataColumn(label: Text('Densidad')),
-                                            DataColumn(
-                                              label: Text('Observación'),
-                                            ),
-                                            DataColumn(label: Text('Acciones')),
-                                          ],
-                                          rows:
-                                              paginatedData.map((it) {
-                                                final id = it.id ?? 0;
-                                                return DataRow(
-                                                  cells: [
-                                                    DataCell(
-                                                      Text(
-                                                        id > 0 ? '$id' : '-',
+                                              DataCell(
+                                                Text(_illnessLabel(it.illness)),
+                                              ),
+                                              DataCell(
+                                                Text(
+                                                  it.density.toStringAsFixed(2),
+                                                ),
+                                              ),
+                                              DataCell(Text(_safeObs(it))),
+                                              DataCell(
+                                                Row(
+                                                  children: [
+                                                    IconButton(
+                                                      tooltip: "Editar",
+                                                      icon: const Icon(
+                                                        Icons.edit,
+                                                        color: Colors.blue,
                                                       ),
+                                                      onPressed:
+                                                          () => _onEdit(it),
                                                     ),
-                                                    DataCell(Text(it.date)),
-                                                    DataCell(
-                                                      Text(
-                                                        it.litres
-                                                            .toStringAsFixed(2),
+                                                    IconButton(
+                                                      tooltip: "Eliminar",
+                                                      icon: const Icon(
+                                                        Icons.delete,
+                                                        color: Colors.red,
                                                       ),
-                                                    ),
-                                                    DataCell(
-                                                      Text(
-                                                        _illnessLabel(
-                                                          it.illness,
-                                                        ),
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      Text(
-                                                        it.density
-                                                            .toStringAsFixed(2),
-                                                      ),
-                                                    ),
-                                                    DataCell(
-                                                      Text(_safeObs(it)),
-                                                    ),
-                                                    DataCell(
-                                                      Row(
-                                                        children: [
-                                                          IconButton(
-                                                            tooltip: "Editar",
-                                                            icon: const Icon(
-                                                              Icons.edit,
-                                                              color:
-                                                                  Colors.blue,
-                                                            ),
-                                                            onPressed:
-                                                                () =>
-                                                                    _onEdit(it),
-                                                          ),
-                                                          IconButton(
-                                                            tooltip: "Eliminar",
-                                                            icon: const Icon(
-                                                              Icons.delete,
-                                                              color: Colors.red,
-                                                            ),
-                                                            onPressed:
-                                                                () => _onDelete(
-                                                                  id,
-                                                                ),
-                                                          ),
-                                                        ],
-                                                      ),
+                                                      onPressed:
+                                                          () => _onDelete(id),
                                                     ),
                                                   ],
-                                                );
-                                              }).toList(),
-                                        ),
-                                      ),
-                                    ),
+                                                ),
+                                              ),
+                                            ],
+                                          );
+                                        }).toList(),
                                   ),
-                        ),
-                      ),
-
-                      if (totalPages > 1)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(totalPages, (index) {
-                                final page = index + 1;
-                                final selected = page == currentPage;
-
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  child: OutlinedButton(
-                                    onPressed: () => goToPage(page),
-                                    style: OutlinedButton.styleFrom(
-                                      backgroundColor:
-                                          selected
-                                              ? Colors.black.withOpacity(0.85)
-                                              : Colors.white.withOpacity(0.75),
-                                      foregroundColor:
-                                          selected
-                                              ? Colors.white
-                                              : Colors.black,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Text('$page'),
-                                  ),
-                                );
-                              }),
+                                ),
+                              ),
                             ),
-                          ),
-                        ),
-
-                      const Footer(),
-                    ],
                   ),
-        ),
+                ),
+
+                if (totalPages > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(totalPages, (index) {
+                          final page = index + 1;
+                          final selected = page == currentPage;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: OutlinedButton(
+                              onPressed: () => goToPage(page),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor:
+                                    selected
+                                        ? Colors.black.withOpacity(0.85)
+                                        : Colors.white.withOpacity(0.75),
+                                foregroundColor:
+                                    selected ? Colors.white : Colors.black,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text('$page'),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+
+                const Footer(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

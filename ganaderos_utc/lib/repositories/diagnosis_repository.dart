@@ -16,6 +16,7 @@ class DiagnosisRepository {
           .map((data) => Diagnosis.fromMap(Map<String, dynamic>.from(data)))
           .toList();
     } catch (e) {
+      // ignore: avoid_print
       print("Error al obtener diagnósticos: $e");
       return [];
     }
@@ -27,6 +28,7 @@ class DiagnosisRepository {
       final response = await ApiConnection.post(endpoint, diagnosis.toMap());
       if (response != null) return Diagnosis.fromMap(response);
     } catch (e) {
+      // ignore: avoid_print
       print("Error al crear diagnóstico: $e");
     }
     return null;
@@ -54,6 +56,7 @@ class DiagnosisRepository {
       // ✅ tolerante: si llega int, num o string
       return _asInt(result) > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al actualizar diagnóstico: $e");
       return false;
     }
@@ -67,6 +70,7 @@ class DiagnosisRepository {
       // ✅ tolerante: si llega int, num o string
       return _asInt(result) > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al eliminar diagnóstico: $e");
       return false;
     }

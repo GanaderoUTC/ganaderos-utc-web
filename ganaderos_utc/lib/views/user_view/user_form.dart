@@ -1,5 +1,6 @@
 // ignore_for_file: file_names
 import 'package:flutter/material.dart';
+// ignore: unused_import
 import 'package:ganaderos_utc/repository/user_company_repository.dart';
 
 import '../../models/user_models.dart';
@@ -33,13 +34,11 @@ class _UserFormState extends State<UserForm> {
   List<Company> companies = [];
   Company? selectedCompany;
 
-  String selectedRole = "user";
+  final String selectedRole = "user";
 
   bool isLoading = true;
   bool isSaving = false;
-
-  bool checkingAdmin = false;
-  bool companyHasAdmin = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -47,14 +46,30 @@ class _UserFormState extends State<UserForm> {
     _init();
   }
 
+  String _toTitleCase(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return value;
+
+    return value
+        .split(' ')
+        .map((word) {
+          if (word.isEmpty) return word;
+          return word[0].toUpperCase() + word.substring(1).toLowerCase();
+        })
+        .join(' ');
+  }
+
+  String _normalize(String text) {
+    return text.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+  }
+
   Future<void> _init() async {
     if (widget.user != null) {
-      nameController.text = widget.user!.name;
-      lastNameController.text = widget.user!.lastName;
-      emailController.text = widget.user!.email ?? "";
+      nameController.text = _toTitleCase(widget.user!.name);
+      lastNameController.text = _toTitleCase(widget.user!.lastName);
+      emailController.text = (widget.user!.email ?? "").trim().toLowerCase();
       dniController.text = widget.user!.dni ?? "";
       usernameController.text = widget.user!.username ?? "";
-      selectedRole = widget.user!.role ?? "user";
     }
 
     try {
@@ -72,8 +87,6 @@ class _UserFormState extends State<UserForm> {
         selectedCompany = companies.first;
       }
 
-      await _checkAdmin();
-
       setState(() => isLoading = false);
     } catch (e) {
       setState(() => isLoading = false);
@@ -84,35 +97,56 @@ class _UserFormState extends State<UserForm> {
     }
   }
 
-  Future<void> _checkAdmin() async {
-    if (selectedCompany == null) return;
+  Future<bool> _isDuplicateName(String value) async {
+    final users = await UserRepository.getAll();
+    final newValue = _normalize(value);
 
-    setState(() => checkingAdmin = true);
+    for (final user in users) {
+      final sameId = widget.user?.id != null && user.id == widget.user!.id;
+      if (sameId) continue;
 
-    try {
-      final users = await UserCompanyRepository.getAllByCompany(
-        selectedCompany!.id!,
-      );
+      if (_normalize(user.name) == newValue) return true;
+    }
+    return false;
+  }
 
-      final admins = users.where((u) => (u.role ?? "user") == "admin");
+  Future<bool> _isDuplicateLastName(String value) async {
+    final users = await UserRepository.getAll();
+    final newValue = _normalize(value);
 
-      bool hasAdmin = admins.isNotEmpty;
+    for (final user in users) {
+      final sameId = widget.user?.id != null && user.id == widget.user!.id;
+      if (sameId) continue;
 
-      if (widget.user != null &&
-          widget.user!.role == "admin" &&
-          admins.length == 1 &&
-          admins.first.id == widget.user!.id) {
-        hasAdmin = false;
-      }
+      if (_normalize(user.lastName) == newValue) return true;
+    }
+    return false;
+  }
 
-      companyHasAdmin = hasAdmin;
+  Future<bool> _isDuplicateEmail(String value) async {
+    final users = await UserRepository.getAll();
+    final newValue = _normalize(value);
 
-      if (companyHasAdmin && selectedRole == "admin") {
-        selectedRole = "user";
-      }
-    } catch (_) {}
+    for (final user in users) {
+      final sameId = widget.user?.id != null && user.id == widget.user!.id;
+      if (sameId) continue;
 
-    setState(() => checkingAdmin = false);
+      if (_normalize(user.email ?? '') == newValue) return true;
+    }
+    return false;
+  }
+
+  Future<bool> _isDuplicateDni(String value) async {
+    final users = await UserRepository.getAll();
+    final newValue = value.trim();
+
+    for (final user in users) {
+      final sameId = widget.user?.id != null && user.id == widget.user!.id;
+      if (sameId) continue;
+
+      if ((user.dni ?? '').trim() == newValue) return true;
+    }
+    return false;
   }
 
   Future<void> _save() async {
@@ -125,31 +159,72 @@ class _UserFormState extends State<UserForm> {
       return;
     }
 
-    if (selectedRole == "admin" && companyHasAdmin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Esta empresa ya tiene administrador")),
-      );
-      return;
-    }
-
     setState(() => isSaving = true);
 
-    final user = User(
-      id: widget.user?.id,
-      name: nameController.text.trim(),
-      lastName: lastNameController.text.trim(),
-      email: emailController.text.trim(),
-      dni: dniController.text.trim(),
-      role: selectedRole,
-      username: usernameController.text.trim(),
-      password:
-          passwordController.text.isEmpty
-              ? null
-              : passwordController.text.trim(),
-      companyId: selectedCompany!.id,
-    );
-
     try {
+      final name = _toTitleCase(nameController.text);
+      final lastName = _toTitleCase(lastNameController.text);
+      final email = emailController.text.trim().toLowerCase();
+      final dni = dniController.text.trim();
+      final username = usernameController.text.trim();
+
+      final existsName = await _isDuplicateName(name);
+      if (existsName) {
+        if (!mounted) return;
+        setState(() => isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Ya existe un usuario con ese nombre")),
+        );
+        return;
+      }
+
+      final existsLastName = await _isDuplicateLastName(lastName);
+      if (existsLastName) {
+        if (!mounted) return;
+        setState(() => isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Ya existe un usuario con ese apellido"),
+          ),
+        );
+        return;
+      }
+
+      final existsEmail = await _isDuplicateEmail(email);
+      if (existsEmail) {
+        if (!mounted) return;
+        setState(() => isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Ya existe un usuario con ese correo")),
+        );
+        return;
+      }
+
+      final existsDni = await _isDuplicateDni(dni);
+      if (existsDni) {
+        if (!mounted) return;
+        setState(() => isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Ya existe un usuario con esa cédula")),
+        );
+        return;
+      }
+
+      final user = User(
+        id: widget.user?.id,
+        name: name,
+        lastName: lastName,
+        email: email,
+        dni: dni,
+        role: selectedRole,
+        username: username,
+        password:
+            passwordController.text.isEmpty
+                ? null
+                : passwordController.text.trim(),
+        companyId: selectedCompany!.id,
+      );
+
       bool ok;
 
       if (widget.user == null) {
@@ -201,16 +276,12 @@ class _UserFormState extends State<UserForm> {
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
-
         child: Padding(
           padding: const EdgeInsets.all(20),
-
           child: Form(
             key: _formKey,
-
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -221,7 +292,6 @@ class _UserFormState extends State<UserForm> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 18),
 
                 _input(
@@ -242,6 +312,7 @@ class _UserFormState extends State<UserForm> {
                   emailController,
                   "Correo",
                   Icons.email,
+                  keyboardType: TextInputType.emailAddress,
                   validator: Validators.email,
                 ),
 
@@ -249,45 +320,8 @@ class _UserFormState extends State<UserForm> {
                   dniController,
                   "Cédula",
                   Icons.badge,
+                  keyboardType: TextInputType.number,
                   validator: Validators.cedulaEC,
-                ),
-
-                const SizedBox(height: 10),
-
-                DropdownButtonFormField<String>(
-                  value: selectedRole,
-                  decoration: const InputDecoration(
-                    labelText: "Rol",
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    DropdownMenuItem(
-                      value: "admin",
-                      enabled: !companyHasAdmin,
-                      child: Text(
-                        companyHasAdmin
-                            ? "Administrador (ocupado)"
-                            : "Administrador",
-                      ),
-                    ),
-
-                    const DropdownMenuItem(
-                      value: "user",
-                      child: Text("Usuario"),
-                    ),
-                  ],
-                  onChanged: (v) {
-                    if (v == "admin" && companyHasAdmin) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("Esta empresa ya tiene administrador"),
-                        ),
-                      );
-                      return;
-                    }
-
-                    setState(() => selectedRole = v!);
-                  },
                 ),
 
                 const SizedBox(height: 10),
@@ -305,12 +339,8 @@ class _UserFormState extends State<UserForm> {
                           child: Text(c.companyName),
                         );
                       }).toList(),
-                  onChanged: (v) async {
-                    selectedCompany = v;
-
-                    await _checkAdmin();
-
-                    setState(() {});
+                  onChanged: (v) {
+                    setState(() => selectedCompany = v);
                   },
                 ),
 
@@ -327,7 +357,8 @@ class _UserFormState extends State<UserForm> {
                   passwordController,
                   isEditing ? "Nueva contraseña (opcional)" : "Contraseña",
                   Icons.lock,
-                  obscure: true,
+                  obscure: _obscurePassword,
+                  isPassword: true,
                   validator: (v) {
                     if (!isEditing) {
                       return Validators.passwordStrong(v);
@@ -335,6 +366,19 @@ class _UserFormState extends State<UserForm> {
                     if (v == null || v.isEmpty) return null;
                     return Validators.passwordStrong(v);
                   },
+                ),
+
+                const SizedBox(height: 8),
+
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "Tipo de usuario fijo: Usuario",
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black54,
+                    ),
+                  ),
                 ),
 
                 const SizedBox(height: 20),
@@ -349,9 +393,7 @@ class _UserFormState extends State<UserForm> {
                         child: const Text("Cancelar"),
                       ),
                     ),
-
                     const SizedBox(width: 10),
-
                     Expanded(
                       child: ElevatedButton(
                         onPressed: isSaving ? null : _save,
@@ -385,6 +427,8 @@ class _UserFormState extends State<UserForm> {
     String label,
     IconData icon, {
     bool obscure = false,
+    bool isPassword = false,
+    TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
   }) {
     return Padding(
@@ -392,11 +436,27 @@ class _UserFormState extends State<UserForm> {
       child: TextFormField(
         controller: controller,
         obscureText: obscure,
+        keyboardType: keyboardType,
         validator: validator,
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: Icon(icon),
           border: const OutlineInputBorder(),
+          suffixIcon:
+              isPassword
+                  ? IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  )
+                  : null,
         ),
       ),
     );

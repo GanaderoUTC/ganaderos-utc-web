@@ -21,6 +21,7 @@ class CollectionRepository {
       } else if (res is Map && res['data'] is List) {
         rawList = res['data'] as List;
       } else {
+        // ignore: avoid_print
         print("⚠️ Formato inesperado en GET $_basePath: ${res.runtimeType}");
         return [];
       }
@@ -29,6 +30,7 @@ class CollectionRepository {
           .map((e) => Collection.fromMap(Map<String, dynamic>.from(e)))
           .toList();
     } catch (e) {
+      // ignore: avoid_print
       print("Error al obtener recolecciones: $e");
       return [];
     }
@@ -43,6 +45,7 @@ class CollectionRepository {
         return Collection.fromMap(Map<String, dynamic>.from(response));
       }
     } catch (e) {
+      // ignore: avoid_print
       print("Error al crear recolección: $e");
     }
     return null;
@@ -62,6 +65,7 @@ class CollectionRepository {
       if (result is bool) return result;
       return result != null;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al actualizar recolección: $e");
       return false;
     }
@@ -76,6 +80,7 @@ class CollectionRepository {
       if (result is bool) return result;
       return result != null;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al eliminar recolección: $e");
       return false;
     }

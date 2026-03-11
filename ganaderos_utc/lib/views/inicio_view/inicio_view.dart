@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../widgets/footer.dart';
 import '../../widgets/navbar.dart';
@@ -21,9 +22,17 @@ class InicioView extends StatelessWidget {
             ),
           ),
 
-          // ✅ Overlay oscuro suave para lectura
+          // ✅ Capa oscura más fuerte
           Positioned.fill(
-            child: Container(color: Colors.black.withOpacity(0.28)),
+            child: Container(color: Colors.black.withOpacity(0.48)),
+          ),
+
+          // ✅ Desenfoque suave para quitar protagonismo al fondo
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 3.5, sigmaY: 3.5),
+              child: Container(color: Colors.black.withOpacity(0.12)),
+            ),
           ),
 
           // ✅ Contenido scroll
@@ -63,11 +72,9 @@ class InicioContent extends StatelessWidget {
             _HeroSection(isMobile: isMobile),
             const SizedBox(height: 18),
 
-            // ✅ Cards institucionales: Quiénes somos / Misión / Visión
             _InfoCardsRow(isMobile: isMobile, isTablet: isTablet),
             const SizedBox(height: 18),
 
-            // ✅ Sección cuidados con 3 tarjetas imagen
             const _SectionTitle(
               title: "Cuidado de vacas lecheras",
               subtitle:
@@ -78,7 +85,6 @@ class InicioContent extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            // ✅ Beneficios del sistema
             const _SectionTitle(
               title: "¿Qué aporta la plataforma?",
               subtitle:
@@ -105,20 +111,20 @@ class _HeroSection extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: EdgeInsets.symmetric(
-        vertical: isMobile ? 18 : 26,
-        horizontal: isMobile ? 16 : 22,
+        vertical: isMobile ? 20 : 28,
+        horizontal: isMobile ? 18 : 24,
       ),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.88),
-        borderRadius: BorderRadius.circular(18),
+        color: Colors.white.withOpacity(0.96),
+        borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.18),
-            blurRadius: 12,
-            offset: const Offset(0, 8),
+            color: Colors.black.withOpacity(0.22),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
+        border: Border.all(color: Colors.white.withOpacity(0.75), width: 1.2),
       ),
       child: Column(
         children: [
@@ -154,8 +160,8 @@ class _HeroSection extends StatelessWidget {
                       "Plataforma de gestión ganadera enfocada en control, registro y consulta para producción lechera.",
                       style: TextStyle(
                         fontSize: isMobile ? 13.5 : 16,
-                        color: Colors.black54,
-                        height: 1.3,
+                        color: Colors.black87,
+                        height: 1.35,
                       ),
                     ),
                   ],
@@ -170,13 +176,13 @@ class _HeroSection extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               _HeroButton(
-                icon: Icons.business,
+                icon: Icons.house_siding,
                 label: "Haciendas",
                 onTap: () => Navigator.pushNamed(context, '/companies'),
                 isPrimary: true,
               ),
               _HeroButton(
-                icon: Icons.monitor_outlined,
+                icon: Icons.bar_chart,
                 label: "Estadísticas",
                 onTap: () => Navigator.pushNamed(context, '/stats'),
                 isPrimary: false,
@@ -215,6 +221,7 @@ class _HeroButton extends StatelessWidget {
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: ElevatedButton.styleFrom(
+        elevation: 2,
         backgroundColor: isPrimary ? Colors.green[700] : Colors.teal[600],
         foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -305,15 +312,16 @@ class _InfoCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.88),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.14),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.16),
+            blurRadius: 14,
             offset: const Offset(0, 8),
           ),
         ],
+        border: Border.all(color: Colors.white.withOpacity(0.65)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -344,8 +352,8 @@ class _InfoCard extends StatelessWidget {
                   item.text,
                   style: const TextStyle(
                     fontSize: 13.8,
-                    color: Colors.black54,
-                    height: 1.25,
+                    color: Colors.black87,
+                    height: 1.3,
                   ),
                 ),
               ],
@@ -370,8 +378,15 @@ class _SectionTitle extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.88),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.14),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -388,7 +403,7 @@ class _SectionTitle extends StatelessWidget {
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54, height: 1.25),
+            style: const TextStyle(color: Colors.black87, height: 1.3),
           ),
         ],
       ),
@@ -414,13 +429,13 @@ class _CareCards extends StatelessWidget {
             'Una dieta balanceada contribuye a una producción constante y mejora el rendimiento.',
       ),
       _ImageCardData(
-        imagePath: 'assets/images/vaca3.png',
+        imagePath: 'assets/images/vaca5.jpg',
         title: 'Espacios limpios',
         description:
             'Ambientes higiénicos disminuyen riesgos y favorecen el bienestar del ganado.',
       ),
       _ImageCardData(
-        imagePath: 'assets/images/vaca3.png',
+        imagePath: 'assets/images/vaca4.jpg',
         title: 'Chequeos veterinarios',
         description:
             'Controles regulares permiten detectar y tratar problemas a tiempo.',
@@ -480,15 +495,16 @@ class _ImageCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
+        color: Colors.white.withOpacity(0.95),
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.14),
-            blurRadius: 12,
+            color: Colors.black.withOpacity(0.15),
+            blurRadius: 14,
             offset: const Offset(0, 8),
           ),
         ],
+        border: Border.all(color: Colors.white.withOpacity(0.65)),
       ),
       child: Column(
         children: [
@@ -496,7 +512,7 @@ class _ImageCard extends StatelessWidget {
             aspectRatio: 4 / 3,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: Image.asset(item.imagePath, fit: BoxFit.contain),
+              child: Image.asset(item.imagePath, fit: BoxFit.cover),
             ),
           ),
           const SizedBox(height: 10),
@@ -513,7 +529,7 @@ class _ImageCard extends StatelessWidget {
           Text(
             item.description,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Colors.black54, height: 1.25),
+            style: const TextStyle(color: Colors.black87, height: 1.3),
           ),
         ],
       ),
@@ -521,7 +537,7 @@ class _ImageCard extends StatelessWidget {
   }
 }
 
-/* ------------------------- BENEFITS GRID (FIX OVERFLOW) ------------------------- */
+/* ------------------------- BENEFITS GRID ------------------------- */
 
 class _BenefitsGrid extends StatelessWidget {
   final bool isMobile;
@@ -562,9 +578,6 @@ class _BenefitsGrid extends StatelessWidget {
       crossAxisCount = 2;
     }
 
-    // ✅ IMPORTANTE:
-    // Ratio más pequeño => más altura.
-    // Desktop antes 2.15 era MUY bajo para algunos tamaños (te daba ~95px).
     final double ratio = isMobile ? 3.3 : (isTablet ? 2.2 : 1.65);
 
     return GridView.builder(
@@ -602,8 +615,6 @@ class _BenefitCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, c) {
         final bool compactWidth = c.maxWidth < 320;
-
-        // ✅ Cuando el Grid te da poca altura, reducimos todo.
         final bool tinyHeight = c.maxHeight < 120;
 
         final double pad = tinyHeight ? 10 : 14;
@@ -616,15 +627,16 @@ class _BenefitCard extends StatelessWidget {
         return Container(
           padding: EdgeInsets.all(pad),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.88),
+            color: Colors.white.withOpacity(0.95),
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withOpacity(0.13),
                 blurRadius: 12,
                 offset: const Offset(0, 8),
               ),
             ],
+            border: Border.all(color: Colors.white.withOpacity(0.60)),
           ),
           child:
               compactWidth
@@ -672,7 +684,7 @@ class _BenefitCard extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min, // ✅ clave
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 item.title,
@@ -687,11 +699,11 @@ class _BenefitCard extends StatelessWidget {
               SizedBox(height: gap2),
               Text(
                 item.text,
-                maxLines: tinyHeight ? 1 : 2, // ✅ menos líneas si no hay alto
+                maxLines: tinyHeight ? 1 : 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: tinyHeight ? 12.3 : 13.2,
-                  color: Colors.black54,
+                  color: Colors.black87,
                   height: 1.15,
                 ),
               ),
@@ -712,7 +724,7 @@ class _BenefitCard extends StatelessWidget {
   }) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min, // ✅ clave
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           padding: EdgeInsets.all(iconPad),
@@ -742,7 +754,7 @@ class _BenefitCard extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
             fontSize: tinyHeight ? 12.3 : 13.2,
-            color: Colors.black54,
+            color: Colors.black87,
             height: 1.15,
           ),
         ),

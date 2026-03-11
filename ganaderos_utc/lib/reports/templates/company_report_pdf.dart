@@ -155,6 +155,7 @@ class CompanyReportPdf {
 
     final headers = rows.first.keys.toList();
 
+    // ignore: deprecated_member_use
     return pw.Table.fromTextArray(
       headers: headers,
       data:

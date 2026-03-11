@@ -39,8 +39,8 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
   bool _loading = true;
   bool _saving = false;
 
-  Company? _company; // fijo
-  Cattle? _cattle; // fijo
+  Company? _company;
+  Cattle? _cattle;
 
   bool get _isEditing => widget.weight != null;
 
@@ -53,13 +53,18 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
       _dateController.text = widget.weight!.date;
       _weightController.text = widget.weight!.weight.toString();
 
-      // observation en tu modelo es String (no nullable), pero igual proteges "null"
       final obs = widget.weight!.observation.toString();
-      _observationController.text = (obs == 'null') ? '' : obs;
+      _observationController.text =
+          (obs == 'null' || obs.trim().isEmpty) ? '' : _capitalizeFirst(obs);
     } else {
-      // ✅ opcional: fecha por defecto hoy (mejora UX)
       _dateController.text = DateTime.now().toIso8601String().split('T').first;
     }
+  }
+
+  String _capitalizeFirst(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
   }
 
   Future<void> _init() async {
@@ -67,7 +72,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
     setState(() => _loading = true);
 
     try {
-      // ✅ 1) Cargar empresa (sin crash)
       final companies = await CompanyRepository().getAll();
       Company? company;
       for (final c in companies) {
@@ -77,7 +81,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
         }
       }
 
-      // ✅ 2) Cargar ganado solo de esa empresa (sin crash)
       final cattleList = await CattleCompanyRepository.getAllByCompany(
         widget.companyId,
       );
@@ -105,6 +108,7 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
           ),
         );
       }
+
       if (cattle == null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -148,12 +152,38 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
   }
 
   String? _validateObservation(String? value) {
-    if (value == null || value.trim().isEmpty) return null; // opcional
+    if (value == null || value.trim().isEmpty) return null;
     if (value.trim().length > 250) return 'Observación muy larga (máx. 250)';
     return null;
   }
 
+  Future<bool> _isDuplicateDate(String date) async {
+    try {
+      // ✅ según tu indicación: usar getAllByCattle
+      final weights = await WeightCompanyRepository.getAllByCattle(
+        widget.cattleId,
+      );
+
+      for (final item in weights) {
+        final sameId = _isEditing && item.id == widget.weight?.id;
+        if (sameId) continue;
+
+        if (item.date.trim() == date.trim()) {
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint("Error validando fecha duplicada: $e");
+      return false;
+    }
+  }
+
   Future<void> _saveForm() async {
+    if (_saving) return;
+
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_company == null ||
@@ -169,19 +199,36 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
     setState(() => _saving = true);
 
     try {
+      final formattedObservation = _capitalizeFirst(
+        _observationController.text,
+      );
+
+      final existsDate = await _isDuplicateDate(_dateController.text.trim());
+      if (existsDate) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Ya existe un registro con esa fecha para este ganado',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _saving = false);
+        return;
+      }
+
       final weightValue = double.tryParse(_weightController.text.trim()) ?? 0.0;
 
       final weight = Weight(
         id: widget.weight?.id,
         date: _dateController.text.trim(),
         weight: weightValue,
-        observation: _observationController.text.trim(),
+        observation: formattedObservation,
         cattleId: _cattle!.id!,
         companyId: _company!.id!,
         cattle: _cattle,
         company: _company,
-
-        // ✅ sync int 0/1 (según tu regla)
         sync: 1,
       );
 
@@ -195,25 +242,33 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
       if (!mounted) return;
 
       if (ok) {
-        widget.onSave();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-              const SnackBar(content: Text("Peso guardado correctamente")),
-            )
-            .closed
-            .then((_) {
-              if (mounted) Navigator.pop(context);
-            });
+        widget.onSave(); // ✅ refresca la tabla/listado automáticamente
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isEditing
+                  ? "Peso actualizado correctamente"
+                  : "Peso guardado correctamente",
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        Navigator.pop(context, true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("No se pudo guardar el peso")),
+          const SnackBar(
+            content: Text("No se pudo guardar el peso"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text("Error: $e")));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -231,7 +286,13 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      title: Text(_isEditing ? 'Editar Peso' : 'Agregar Nuevo Peso'),
+      title: Text(
+        _isEditing ? 'Editar Peso' : 'Agregar Nuevo Peso',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF2C3E50),
+        ),
+      ),
       content:
           _loading
               ? const SizedBox(
@@ -257,7 +318,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                           ),
                         ),
                         const SizedBox(height: 15),
-
                         TextFormField(
                           initialValue:
                               "${_cattle?.name ?? '---'} (${_cattle?.code ?? '-'})",
@@ -269,7 +329,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                           ),
                         ),
                         const SizedBox(height: 15),
-
                         TextFormField(
                           controller: _dateController,
                           readOnly: true,
@@ -286,7 +345,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                                       : null,
                         ),
                         const SizedBox(height: 15),
-
                         TextFormField(
                           controller: _weightController,
                           keyboardType: const TextInputType.numberWithOptions(
@@ -300,7 +358,6 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
                           validator: _validateWeight,
                         ),
                         const SizedBox(height: 15),
-
                         TextFormField(
                           controller: _observationController,
                           maxLines: 2,
@@ -319,16 +376,35 @@ class _WeightCompanyFormState extends State<WeightCompanyForm> {
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.red,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           child: const Text('Cancelar'),
         ),
         ElevatedButton.icon(
           onPressed: _saving ? null : _saveForm,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           icon:
               _saving
                   ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                   : const Icon(Icons.save),
           label: Text(_isEditing ? 'Actualizar' : 'Guardar'),

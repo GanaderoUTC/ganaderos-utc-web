@@ -152,15 +152,17 @@ class ApiConnection {
         if (decoded is List) {
           return List<Map<String, dynamic>>.from(decoded);
         }
+        // ignore: avoid_print
         print(
           "GET LIST ERROR: Se esperaba List pero llegó ${decoded.runtimeType}",
         );
         return [];
       }
-
+      // ignore: avoid_print
       print("GET LIST ERROR: ${response.statusCode} - ${response.body}");
       return [];
     } catch (e) {
+      // ignore: avoid_print
       print("GET LIST EXCEPTION: $e");
       return [];
     }
@@ -186,16 +188,17 @@ class ApiConnection {
         final decoded = json.decode(response.body);
         if (decoded is Map<String, dynamic>) return decoded;
         if (decoded is Map) return Map<String, dynamic>.from(decoded);
-
+        // ignore: avoid_print
         print(
           "GET MAP QUERY ERROR: Se esperaba Map pero llegó ${decoded.runtimeType}",
         );
         return null;
       }
-
+      // ignore: avoid_print
       print("GET MAP QUERY ERROR: ${response.statusCode} - ${response.body}");
       return null;
     } catch (e) {
+      // ignore: avoid_print
       print("GET MAP QUERY EXCEPTION: $e");
       return null;
     }
@@ -217,10 +220,11 @@ class ApiConnection {
       if (response.statusCode == 200) {
         return List<Map<String, dynamic>>.from(json.decode(response.body));
       }
-
+      // ignore: avoid_print
       print("GET ERROR: ${response.statusCode} - ${response.body}");
       return [];
     } catch (e) {
+      // ignore: avoid_print
       print("GET EXCEPTION: $e");
       return [];
     }
@@ -259,9 +263,11 @@ class ApiConnection {
         return json.decode(response.body);
       }
 
+      // ignore: avoid_print
       print("POST ERROR: ${response.statusCode} - ${response.body}");
       return null;
     } catch (e) {
+      // ignore: avoid_print
       print("POST EXCEPTION: $e");
       return null;
     }
@@ -296,10 +302,11 @@ class ApiConnection {
       if (response.statusCode == 200) {
         return int.parse(response.body);
       }
-
+      // ignore: avoid_print
       print("PATCH ERROR: ${response.statusCode}");
       return 0;
     } catch (e) {
+      // ignore: avoid_print
       print("PATCH EXCEPTION: $e");
       return 0;
     }
@@ -321,10 +328,11 @@ class ApiConnection {
       if (response.statusCode == 200) {
         return int.parse(response.body);
       }
-
+      // ignore: avoid_print
       print("DELETE ERROR: ${response.statusCode}");
       return 0;
     } catch (e) {
+      // ignore: avoid_print
       print("DELETE EXCEPTION: $e");
       return 0;
     }

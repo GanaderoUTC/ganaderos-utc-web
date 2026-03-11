@@ -5,6 +5,9 @@ import 'package:ganaderos_utc/views/stats_view/stats_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 
+// ✅ NUEVO IMPORT
+import 'guards/auth_guard.dart';
+
 // vistas...
 import 'views/inicio_view/inicio_view.dart';
 import 'views/breeds_view/breeds_view.dart';
@@ -35,13 +38,13 @@ Future<void> main() async {
   // ✅ Leer estado de login de forma segura
   final prefs = await SharedPreferences.getInstance();
   final bool isLogged = prefs.getBool('isLoggedIn') ?? false;
+  final String token = prefs.getString('token') ?? '';
 
-  // ✅ Si quieres, puedes validar aquí otras claves críticas (token/user)
-  // final token = prefs.getString('token');
-  // final userJson = prefs.getString('user');
-  // final bool sessionOk = isLogged && token != null && token.isNotEmpty && userJson != null && userJson.isNotEmpty;
-
-  runApp(GanaderosUTCApp(initialRoute: isLogged ? '/inicio' : '/login'));
+  runApp(
+    GanaderosUTCApp(
+      initialRoute: (isLogged && token.isNotEmpty) ? '/inicio' : '/login',
+    ),
+  );
 }
 
 class GanaderosUTCApp extends StatelessWidget {
@@ -59,21 +62,22 @@ class GanaderosUTCApp extends StatelessWidget {
         '/login': (context) => const Scaffold(body: LoginWidget()),
         '/register': (_) => const RegisterWidget(),
 
-        // Rutas principales
-        '/inicio': (context) => const InicioView(),
-        '/breeds': (context) => const BreedsView(),
-        '/categories': (context) => const CategoriesView(),
-        '/cattle': (context) => const CattleView(),
-        '/checkup': (context) => const CheckupView(),
-        '/collection': (context) => const CollectionView(),
-        '/companies': (context) => const CompaniesView(),
-        '/diagnosis': (context) => const DiagnosisView(),
-        '/origin': (context) => const OriginView(),
-        '/user': (context) => const UserView(),
-        '/vaccines': (context) => const VaccineView(),
-        '/weight': (context) => const WeightView(),
-        '/stats': (_) => const StatsView(),
-        '/companies-map': (context) => const CompaniesMapView(),
+        // ✅ Rutas protegidas
+        '/inicio': (context) => const AuthGuard(child: InicioView()),
+        '/breeds': (context) => const AuthGuard(child: BreedsView()),
+        '/categories': (context) => const AuthGuard(child: CategoriesView()),
+        '/cattle': (context) => const AuthGuard(child: CattleView()),
+        '/checkup': (context) => const AuthGuard(child: CheckupView()),
+        '/collection': (context) => const AuthGuard(child: CollectionView()),
+        '/companies': (context) => const AuthGuard(child: CompaniesView()),
+        '/diagnosis': (context) => const AuthGuard(child: DiagnosisView()),
+        '/origin': (context) => const AuthGuard(child: OriginView()),
+        '/user': (context) => const AuthGuard(child: UserView()),
+        '/vaccines': (context) => const AuthGuard(child: VaccineView()),
+        '/weight': (context) => const AuthGuard(child: WeightView()),
+        '/stats': (_) => const AuthGuard(child: StatsView()),
+        '/companies-map':
+            (context) => const AuthGuard(child: CompaniesMapView()),
       },
 
       // ✅ Si alguna ruta no existe, evita crasheos y vuelve a login

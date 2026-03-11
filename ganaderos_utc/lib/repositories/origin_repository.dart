@@ -12,6 +12,7 @@ class OriginRepository {
       );
       return dataList.map((data) => Origin.fromMap(data)).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("Error al obtener orígenes: $e");
       return [];
     }
@@ -25,6 +26,7 @@ class OriginRepository {
         return Origin.fromMap(response);
       }
     } catch (e) {
+      // ignore: avoid_print
       print("Error al crear origen: $e");
     }
     return null;
@@ -40,6 +42,7 @@ class OriginRepository {
       ));
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al actualizar origen: $e");
       return false;
     }
@@ -51,6 +54,7 @@ class OriginRepository {
       final int result = (await ApiConnection.delete('$endpoint/$id'));
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al eliminar origen: $e");
       return false;
     }

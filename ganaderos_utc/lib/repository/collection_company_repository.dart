@@ -32,6 +32,7 @@ class CollectionCattleRepository {
       // filtro de respaldo si API falla
       return parsed.where((c) => c.cattleId == cattleId).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener recolecciones por cattleId=$cattleId: $e");
       return [];
     }
@@ -49,6 +50,7 @@ class CollectionCattleRepository {
       final Map<String, dynamic> data = collection.toMap();
 
       // debug útil
+      // ignore: avoid_print
       print("📤 POST Collection: $data");
 
       final response = await ApiConnection.post(_basePath, data);
@@ -57,6 +59,7 @@ class CollectionCattleRepository {
 
       return Collection.fromMap(Map<String, dynamic>.from(response));
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear recolección: $e");
       return null;
     }
@@ -70,6 +73,7 @@ class CollectionCattleRepository {
       final id = collection.id;
 
       if (id == null) {
+        // ignore: avoid_print
         print("❌ No se puede actualizar: id es null");
         return false;
       }
@@ -81,13 +85,14 @@ class CollectionCattleRepository {
       }
 
       final Map<String, dynamic> data = collection.toMap();
-
+      // ignore: avoid_print
       print("📤 PATCH Collection ($id): $data");
 
       final int result = await ApiConnection.patch("$_basePath/$id", data);
 
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar recolección: $e");
       return false;
     }
@@ -99,13 +104,14 @@ class CollectionCattleRepository {
   static Future<bool> deleteForCattle(int id) async {
     try {
       if (id <= 0) return false;
-
+      // ignore: avoid_print
       print("🗑 DELETE Collection: $id");
 
       final int result = await ApiConnection.delete("$_basePath/$id");
 
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar recolección: $e");
       return false;
     }

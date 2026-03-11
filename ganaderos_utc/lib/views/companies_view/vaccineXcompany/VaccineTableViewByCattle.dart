@@ -1,4 +1,5 @@
 // ignore_for_file: file_names
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../../../models/vaccine_models.dart';
 import '../../../repository/vaccine_company_repository.dart';
@@ -44,7 +45,6 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
     super.dispose();
   }
 
-  // ✅ rows per page responsive
   int _rowsPerPage(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
     return (w < 600) ? 5 : 10;
@@ -191,13 +191,20 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
   Widget _tableCard(Widget child) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.82),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.25)),
+        gradient: LinearGradient(
+          colors: [
+            Colors.white.withOpacity(0.88),
+            const Color(0xFFF4F8FB).withOpacity(0.84),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.30)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.18),
-            blurRadius: 14,
+            blurRadius: 16,
             offset: const Offset(0, 8),
           ),
         ],
@@ -218,295 +225,319 @@ class _VaccineTableViewByCattleState extends State<VaccineTableViewByCattle> {
         title: Text("Vacunas - ${widget.cattleName}"),
         backgroundColor: Colors.green[700],
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage('assets/images/fondo_general_2.jpg'),
-            fit: BoxFit.cover,
-            alignment: Alignment.center,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/fondo_general_2.jpg',
+              fit: BoxFit.cover,
+              alignment: Alignment.center,
+            ),
           ),
-        ),
-        child: Container(
-          color: Colors.black.withOpacity(0.06),
-          child:
-              isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child:
-                            isMobile
-                                ? Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    ElevatedButton.icon(
-                                      onPressed: _onAdd,
-                                      icon: const Icon(Icons.add),
-                                      label: const Text('Agregar Vacuna'),
-                                      style: _topButtonStyle(
-                                        Colors.green.shade700,
-                                        fullWidth: true,
-                                      ),
+          Positioned.fill(
+            child: Container(color: Colors.black.withOpacity(0.28)),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 3.5, sigmaY: 3.5),
+              child: Container(
+                color: const Color(0xFF0B1F14).withOpacity(0.08),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(height: 14),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    ElevatedButton.icon(
+                      onPressed: _onAdd,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Agregar Vacuna'),
+                      style: _topButtonStyle(Colors.green.shade700),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: _load,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Actualizar'),
+                      style: _topButtonStyle(Colors.green.shade500),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.pop(context),
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Regresar'),
+                      style: _topButtonStyle(Colors.teal.shade600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child:
+                        isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : list.isEmpty
+                            ? _tableCard(
+                              const Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(16),
+                                  child: Text(
+                                    "No hay vacunas registradas",
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFF1E2A35),
                                     ),
-                                    const SizedBox(height: 10),
-                                    ElevatedButton.icon(
-                                      onPressed: _load,
-                                      icon: const Icon(Icons.refresh),
-                                      label: const Text('Actualizar'),
-                                      style: _topButtonStyle(
-                                        Colors.green.shade500,
-                                        fullWidth: true,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    ElevatedButton.icon(
-                                      onPressed: () => Navigator.pop(context),
-                                      icon: const Icon(Icons.arrow_back),
-                                      label: const Text('Regresar'),
-                                      style: _topButtonStyle(
-                                        Colors.teal.shade600,
-                                        fullWidth: true,
-                                      ),
-                                    ),
-                                  ],
-                                )
-                                : Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  alignment: WrapAlignment.start,
-                                  children: [
-                                    ElevatedButton.icon(
-                                      onPressed: _onAdd,
-                                      icon: const Icon(Icons.add),
-                                      label: const Text('Agregar Vacuna'),
-                                      style: _topButtonStyle(
-                                        Colors.green.shade700,
-                                      ),
-                                    ),
-                                    ElevatedButton.icon(
-                                      onPressed: _load,
-                                      icon: const Icon(Icons.refresh),
-                                      label: const Text('Actualizar'),
-                                      style: _topButtonStyle(
-                                        Colors.green.shade500,
-                                      ),
-                                    ),
-                                    ElevatedButton.icon(
-                                      onPressed: () => Navigator.pop(context),
-                                      icon: const Icon(Icons.arrow_back),
-                                      label: const Text('Regresar'),
-                                      style: _topButtonStyle(
-                                        Colors.teal.shade600,
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
-                      ),
-
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          child:
-                              list.isEmpty
-                                  ? _tableCard(
-                                    const Center(
-                                      child: Padding(
-                                        padding: EdgeInsets.all(16),
-                                        child: Text(
-                                          "No hay vacunas registradas",
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                  : SingleChildScrollView(
-                                    controller: _verticalController,
-                                    child: SingleChildScrollView(
-                                      controller: _horizontalController,
-                                      scrollDirection: Axis.horizontal,
-                                      child: ConstrainedBox(
-                                        // ✅ minWidth ayuda en web móvil
-                                        constraints: BoxConstraints(
-                                          minWidth: isMobile ? 720 : 900,
-                                        ),
-                                        child: _tableCard(
-                                          DataTable(
-                                            columnSpacing: isMobile ? 18 : 30,
-                                            headingRowColor:
-                                                WidgetStateProperty.all(
-                                                  Colors.black.withOpacity(
-                                                    0.85,
+                              ),
+                            )
+                            : _tableCard(
+                              Column(
+                                children: [
+                                  Expanded(
+                                    child: Scrollbar(
+                                      controller: _verticalController,
+                                      thumbVisibility: true,
+                                      child: SingleChildScrollView(
+                                        controller: _verticalController,
+                                        child: Scrollbar(
+                                          controller: _horizontalController,
+                                          thumbVisibility: true,
+                                          notificationPredicate:
+                                              (notification) =>
+                                                  notification.depth == 1,
+                                          child: SingleChildScrollView(
+                                            controller: _horizontalController,
+                                            scrollDirection: Axis.horizontal,
+                                            child: ConstrainedBox(
+                                              constraints: BoxConstraints(
+                                                minWidth: isMobile ? 720 : 900,
+                                              ),
+                                              child: DataTable(
+                                                columnSpacing:
+                                                    isMobile ? 18 : 30,
+                                                dataRowMinHeight: 56,
+                                                dataRowMaxHeight: 72,
+                                                headingRowHeight: 52,
+                                                headingRowColor:
+                                                    WidgetStateProperty.all(
+                                                      const Color(
+                                                        0xFF000000,
+                                                      ).withOpacity(0.92),
+                                                    ),
+                                                headingTextStyle:
+                                                    const TextStyle(
+                                                      color: Colors.white,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontSize: 13.5,
+                                                    ),
+                                                dataRowColor:
+                                                    WidgetStateProperty.resolveWith(
+                                                      (states) {
+                                                        return states.contains(
+                                                              WidgetState
+                                                                  .hovered,
+                                                            )
+                                                            ? const Color(
+                                                              0xFFEAF2F8,
+                                                            ).withOpacity(0.92)
+                                                            : Colors.white
+                                                                .withOpacity(
+                                                                  0.92,
+                                                                );
+                                                      },
+                                                    ),
+                                                dividerThickness: 0.7,
+                                                border: TableBorder(
+                                                  horizontalInside: BorderSide(
+                                                    color: Colors.grey
+                                                        .withOpacity(0.18),
                                                   ),
                                                 ),
-                                            headingTextStyle: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            dataRowColor:
-                                                WidgetStateProperty.resolveWith(
-                                                  (states) =>
-                                                      states.contains(
-                                                            WidgetState.hovered,
-                                                          )
-                                                          ? Colors.grey
-                                                              .withOpacity(0.15)
-                                                          : Colors.white
-                                                              .withOpacity(
-                                                                0.92,
-                                                              ),
-                                                ),
-                                            columns: const [
-                                              DataColumn(label: Text('ID')),
-                                              DataColumn(label: Text('Fecha')),
-                                              DataColumn(label: Text('Vacuna')),
-                                              DataColumn(
-                                                label: Text('Observación'),
-                                              ),
-                                              DataColumn(
-                                                label: Text('Acciones'),
-                                              ),
-                                            ],
-                                            rows:
-                                                rows.map((it) {
-                                                  final id = it.id ?? 0;
+                                                columns: const [
+                                                  DataColumn(label: Text('ID')),
+                                                  DataColumn(
+                                                    label: Text('Fecha'),
+                                                  ),
+                                                  DataColumn(
+                                                    label: Text('Vacuna'),
+                                                  ),
+                                                  DataColumn(
+                                                    label: Text('Observación'),
+                                                  ),
+                                                  DataColumn(
+                                                    label: Text('Acciones'),
+                                                  ),
+                                                ],
+                                                rows:
+                                                    rows.map((it) {
+                                                      final id = it.id ?? 0;
 
-                                                  // ✅ FIX: observation puede ser null
-                                                  final obs =
-                                                      (it.observation == null ||
-                                                              it.observation!
-                                                                  .trim()
-                                                                  .isEmpty)
-                                                          ? '-'
-                                                          : it.observation!
-                                                              .trim();
+                                                      final obs =
+                                                          (it.observation ==
+                                                                      null ||
+                                                                  it.observation!
+                                                                      .trim()
+                                                                      .isEmpty)
+                                                              ? '-'
+                                                              : it.observation!
+                                                                  .trim();
 
-                                                  return DataRow(
-                                                    cells: [
-                                                      DataCell(
-                                                        Text(
-                                                          id > 0 ? '$id' : '-',
-                                                        ),
-                                                      ),
-                                                      DataCell(Text(it.date)),
-                                                      DataCell(
-                                                        SizedBox(
-                                                          width:
-                                                              isMobile
-                                                                  ? 160
-                                                                  : 220,
-                                                          child: Text(
-                                                            it.name,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            maxLines: 1,
+                                                      return DataRow(
+                                                        cells: [
+                                                          DataCell(
+                                                            Text(
+                                                              id > 0
+                                                                  ? '$id'
+                                                                  : '-',
+                                                            ),
                                                           ),
-                                                        ),
-                                                      ),
-                                                      DataCell(
-                                                        SizedBox(
-                                                          width:
-                                                              isMobile
-                                                                  ? 220
-                                                                  : 340,
-                                                          child: Text(
-                                                            obs,
-                                                            overflow:
-                                                                TextOverflow
-                                                                    .ellipsis,
-                                                            maxLines: 2,
+                                                          DataCell(
+                                                            Text(it.date),
                                                           ),
-                                                        ),
-                                                      ),
-                                                      DataCell(
-                                                        Row(
-                                                          children: [
-                                                            IconButton(
-                                                              tooltip: "Editar",
-                                                              icon: const Icon(
-                                                                Icons.edit,
-                                                                color:
-                                                                    Colors.blue,
+                                                          DataCell(
+                                                            SizedBox(
+                                                              width:
+                                                                  isMobile
+                                                                      ? 160
+                                                                      : 220,
+                                                              child: Text(
+                                                                it.name,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                maxLines: 1,
                                                               ),
-                                                              onPressed:
-                                                                  () => _onEdit(
-                                                                    it,
+                                                            ),
+                                                          ),
+                                                          DataCell(
+                                                            SizedBox(
+                                                              width:
+                                                                  isMobile
+                                                                      ? 220
+                                                                      : 340,
+                                                              child: Text(
+                                                                obs,
+                                                                overflow:
+                                                                    TextOverflow
+                                                                        .ellipsis,
+                                                                maxLines: 2,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          DataCell(
+                                                            Row(
+                                                              mainAxisSize:
+                                                                  MainAxisSize
+                                                                      .min,
+                                                              children: [
+                                                                IconButton(
+                                                                  tooltip:
+                                                                      "Editar",
+                                                                  icon: const Icon(
+                                                                    Icons.edit,
+                                                                    color:
+                                                                        Colors
+                                                                            .blue,
                                                                   ),
+                                                                  onPressed:
+                                                                      () =>
+                                                                          _onEdit(
+                                                                            it,
+                                                                          ),
+                                                                ),
+                                                                IconButton(
+                                                                  tooltip:
+                                                                      "Eliminar",
+                                                                  icon: const Icon(
+                                                                    Icons
+                                                                        .delete,
+                                                                    color:
+                                                                        Colors
+                                                                            .red,
+                                                                  ),
+                                                                  onPressed:
+                                                                      () =>
+                                                                          _onDelete(
+                                                                            id,
+                                                                          ),
+                                                                ),
+                                                              ],
                                                             ),
-                                                            IconButton(
-                                                              tooltip:
-                                                                  "Eliminar",
-                                                              icon: const Icon(
-                                                                Icons.delete,
-                                                                color:
-                                                                    Colors.red,
-                                                              ),
-                                                              onPressed:
-                                                                  () =>
-                                                                      _onDelete(
-                                                                        id,
-                                                                      ),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  );
-                                                }).toList(),
+                                                          ),
+                                                        ],
+                                                      );
+                                                    }).toList(),
+                                              ),
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                        ),
-                      ),
-
-                      if (totalPages > 1)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: List.generate(totalPages, (index) {
-                                final page = index + 1;
-                                final selected = page == currentPage;
-
-                                return Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                  ),
-                                  child: OutlinedButton(
-                                    onPressed: () => goToPage(page),
-                                    style: OutlinedButton.styleFrom(
-                                      backgroundColor:
-                                          selected
-                                              ? Colors.black.withOpacity(0.85)
-                                              : Colors.white.withOpacity(0.75),
-                                      foregroundColor:
-                                          selected
-                                              ? Colors.white
-                                              : Colors.black,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                    ),
-                                    child: Text('$page'),
-                                  ),
-                                );
-                              }),
+                                ],
+                              ),
                             ),
-                          ),
-                        ),
-
-                      const Footer(),
-                    ],
                   ),
-        ),
+                ),
+                if (totalPages > 1)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(totalPages, (index) {
+                          final page = index + 1;
+                          final selected = page == currentPage;
+
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: OutlinedButton(
+                              onPressed: () => goToPage(page),
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor:
+                                    selected
+                                        ? const Color(
+                                          0xFF1F2937,
+                                        ).withOpacity(0.95)
+                                        : Colors.white.withOpacity(0.80),
+                                foregroundColor:
+                                    selected ? Colors.white : Colors.black87,
+                                side: BorderSide(
+                                  color:
+                                      selected
+                                          ? Colors.transparent
+                                          : Colors.grey.withOpacity(0.35),
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: Text(
+                                '$page',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+                const Footer(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

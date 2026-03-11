@@ -28,6 +28,7 @@ class CheckupRepository {
           .map((e) => Checkup.fromMap(Map<String, dynamic>.from(e)))
           .toList();
     } catch (e) {
+      // ignore: avoid_print
       print("Error al obtener chequeos: $e");
       return [];
     }
@@ -48,6 +49,7 @@ class CheckupRepository {
         return Checkup.fromMap(Map<String, dynamic>.from(response['data']));
       }
     } catch (e) {
+      // ignore: avoid_print
       print("Error al crear chequeo: $e");
     }
     return null;
@@ -66,6 +68,7 @@ class CheckupRepository {
       if (result is int) return result > 0;
       return result != null;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al actualizar chequeo: $e");
       return false;
     }
@@ -79,6 +82,7 @@ class CheckupRepository {
       if (result is int) return result > 0;
       return result != null;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al eliminar chequeo: $e");
       return false;
     }

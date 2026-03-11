@@ -123,39 +123,46 @@ class CompanyRepository {
   Map<String, dynamic> _normalizePayload(Company c) {
     final map = <String, dynamic>{
       'id': c.id,
-      'company_code': c.companyCode.trim(),
-      'company_name': c.companyName.trim(),
-      'responsible': c.responsible.trim(),
-      'dni': c.dni.trim(),
-      'contact': c.contact.trim(),
-      'email': c.email.trim(),
+      'company_code': _cleanRequired(c.companyCode),
+      'company_name': _cleanRequired(c.companyName),
+      'responsible': _cleanRequired(c.responsible),
+      'dni': _cleanRequired(c.dni),
+      'contact': _cleanRequired(c.contact),
+      'email': _cleanRequired(c.email),
 
       // ✅ solo parish se mantiene
       'parish': _cleanNullable(c.parish),
       'city': _cleanNullable(c.city),
+
+      // ✅ opcionales
       'quarter': _cleanNullable(c.quarter),
       'neighborhood': _cleanNullable(c.neighborhood),
 
-      'address': c.address.trim(),
+      'address': _cleanRequired(c.address),
       'code_address': _cleanNullable(c.codeAddress),
 
       // ✅ SOLO coordinates se envía al backend
-      'coordinates': c.coordinatesString,
+      'coordinates': _cleanNullable(c.coordinatesString),
 
+      // ✅ opcionales numéricos
       'surface': c.surface,
       'fertility_percentage': c.fertilityPercentage,
       'birth_rate': c.birthRate,
       'mortality_rate': c.mortalityRate,
       'weaning_percentage': c.weaningPercentage,
-      'liters_of_milk': c.litersOfMilk,
 
+      'liters_of_milk': c.litersOfMilk,
       'observation': _cleanNullable(c.observation),
     };
 
-    // limpia nulls
+    // ✅ limpia null
     map.removeWhere((key, value) => value == null);
 
     return map;
+  }
+
+  String _cleanRequired(String value) {
+    return value.trim();
   }
 
   String? _cleanNullable(String? value) {

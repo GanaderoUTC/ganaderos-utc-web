@@ -12,6 +12,7 @@ class VaccineRepository {
       );
       return dataList.map((data) => Vaccine.fromMap(data)).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener vacunas: $e");
       return [];
     }
@@ -25,6 +26,7 @@ class VaccineRepository {
         return Vaccine.fromMap(response);
       }
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear vacuna: $e");
     }
     return null;
@@ -40,6 +42,7 @@ class VaccineRepository {
       ));
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar vacuna: $e");
       return false;
     }
@@ -51,6 +54,7 @@ class VaccineRepository {
       final int result = (await ApiConnection.delete("$_basePath/$id"));
       return result > 0;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar vacuna: $e");
       return false;
     }

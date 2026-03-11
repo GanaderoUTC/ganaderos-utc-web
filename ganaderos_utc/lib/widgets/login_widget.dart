@@ -2,8 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../repositories/user_repository.dart';
-// Si tu User model está en otro archivo, importa aquí:
-// import '../models/user_models.dart';
+import '../models/user_models.dart'; // ✅ User model
 
 class LoginWidget extends StatefulWidget {
   const LoginWidget({super.key});
@@ -15,11 +14,12 @@ class LoginWidget extends StatefulWidget {
 class _LoginWidgetState extends State<LoginWidget> {
   final _formKey = GlobalKey<FormState>();
 
-  final usernameController = TextEditingController();
-  final passwordController = TextEditingController();
+  final TextEditingController usernameController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
 
   bool isLoading = false;
   String? errorMessage;
+  bool _obscurePassword = true;
 
   @override
   void dispose() {
@@ -28,8 +28,45 @@ class _LoginWidgetState extends State<LoginWidget> {
     super.dispose();
   }
 
+  /// Primera letra en mayúscula y el resto en minúsculas
+  String _capitalizeFirst(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
+  }
+
+  String? _validateUsername(String? value) {
+    if (value == null) return 'El usuario es obligatorio';
+
+    final s = value.trim();
+
+    if (s.isEmpty) return 'El usuario es obligatorio';
+    if (s.length < 3) return 'Usuario muy corto';
+    if (s.length > 50) return 'Usuario muy largo (máx. 50)';
+
+    final ok = RegExp(r"^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9._\-\s]{3,50}$").hasMatch(s);
+    if (!ok) return 'Usuario inválido';
+
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null) return 'La contraseña es obligatoria';
+
+    final s = value.trim();
+
+    if (s.isEmpty) return 'La contraseña es obligatoria';
+    if (s.length < 4) return 'La contraseña es muy corta';
+    if (s.length > 100) return 'La contraseña es muy larga';
+
+    return null;
+  }
+
   Future<void> _handleLogin() async {
     if (isLoading) return;
+
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -38,27 +75,35 @@ class _LoginWidgetState extends State<LoginWidget> {
     });
 
     try {
+      final formattedUsername = _capitalizeFirst(usernameController.text);
+      final formattedPassword = passwordController.text.trim();
+
       // 🔵 LOGIN AL API
-      final user = await UserRepository.login(
-        usernameController.text.trim(),
-        passwordController.text.trim(),
+      final User? user = await UserRepository.login(
+        formattedUsername,
+        formattedPassword,
       );
 
       if (!mounted) return;
 
       if (user != null) {
-        // 🔵 GUARDAR SESIÓN
         final prefs = await SharedPreferences.getInstance();
+
+        // ✅ Guardar sesión activa
         await prefs.setBool("isLoggedIn", true);
 
-        // ✅ MUY RECOMENDADO: guardar el user para usar role/company después
-        // Requiere que tu modelo tenga toMap()
+        // ✅ Guardar token para AuthGuard
+        // Si luego tu API devuelve token real, aquí reemplazas "sesion_activa"
+        await prefs.setString("token", "sesion_activa");
+
+        // ✅ Guardar usuario completo en sesión
         try {
           final userJson = jsonEncode(user.toDbMap());
           await prefs.setString("user", userJson);
-        } catch (_) {
-          // Si tu modelo no tiene toMap(), no rompe el login.
-        }
+        } catch (_) {}
+
+        // ✅ Rol opcional si lo necesitas después
+        // await prefs.setString("role", "superadmin");
 
         // 🔵 REDIRECCIONAR A INICIO
         Navigator.pushNamedAndRemoveUntil(context, "/inicio", (_) => false);
@@ -69,7 +114,9 @@ class _LoginWidgetState extends State<LoginWidget> {
       if (!mounted) return;
       setState(() => errorMessage = "Error al iniciar sesión: $e");
     } finally {
-      if (mounted) setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
   }
 
@@ -78,28 +125,23 @@ class _LoginWidgetState extends State<LoginWidget> {
     final size = MediaQuery.of(context).size;
     final isMobile = size.width < 700;
 
-    final cardPadding = isMobile ? 16.0 : 22.0;
-    final outerPadding = isMobile ? 14.0 : 24.0;
-    final titleSize = isMobile ? 22.0 : 26.0;
-    final radius = isMobile ? 14.0 : 18.0;
+    final double cardPadding = isMobile ? 16.0 : 22.0;
+    final double outerPadding = isMobile ? 14.0 : 24.0;
+    final double titleSize = isMobile ? 22.0 : 26.0;
+    final double radius = isMobile ? 14.0 : 18.0;
 
     return Scaffold(
       body: Stack(
         children: [
-          // Fondo
           Positioned.fill(
             child: Image.asset(
               "assets/images/fondo_login.jpg",
               fit: BoxFit.cover,
             ),
           ),
-
-          // ✅ Overlay para legibilidad (muy importante en móvil)
           Positioned.fill(
             child: Container(color: Colors.black.withOpacity(0.45)),
           ),
-
-          // Card responsive
           Center(
             child: SingleChildScrollView(
               padding: EdgeInsets.all(outerPadding),
@@ -135,45 +177,46 @@ class _LoginWidgetState extends State<LoginWidget> {
                                 color: Colors.black54,
                               ),
                             ),
-
                             const SizedBox(height: 22),
 
-                            // Username
                             TextFormField(
                               controller: usernameController,
                               decoration: const InputDecoration(
-                                labelText: "Usuario",
+                                labelText: "Administrador",
                                 prefixIcon: Icon(Icons.person),
                                 border: OutlineInputBorder(),
                               ),
                               autofillHints: const [AutofillHints.username],
                               textInputAction: TextInputAction.next,
-                              validator:
-                                  (v) =>
-                                      (v == null || v.trim().isEmpty)
-                                          ? "Ingrese su usuario"
-                                          : null,
+                              validator: _validateUsername,
                             ),
 
                             const SizedBox(height: 14),
 
-                            // Password
                             TextFormField(
                               controller: passwordController,
-                              obscureText: true,
-                              decoration: const InputDecoration(
+                              obscureText: _obscurePassword,
+                              decoration: InputDecoration(
                                 labelText: "Contraseña",
-                                prefixIcon: Icon(Icons.lock),
-                                border: OutlineInputBorder(),
+                                prefixIcon: const Icon(Icons.lock),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_off
+                                        : Icons.visibility,
+                                  ),
+                                ),
                               ),
                               autofillHints: const [AutofillHints.password],
                               textInputAction: TextInputAction.done,
                               onFieldSubmitted: (_) => _handleLogin(),
-                              validator:
-                                  (v) =>
-                                      (v == null || v.trim().isEmpty)
-                                          ? "Ingrese su contraseña"
-                                          : null,
+                              validator: _validatePassword,
                             ),
 
                             const SizedBox(height: 16),
@@ -191,7 +234,6 @@ class _LoginWidgetState extends State<LoginWidget> {
                               const SizedBox(height: 10),
                             ],
 
-                            // Botón login
                             SizedBox(
                               width: double.infinity,
                               height: 46,
@@ -211,6 +253,7 @@ class _LoginWidgetState extends State<LoginWidget> {
                                           height: 20,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
+                                            color: Colors.white,
                                           ),
                                         )
                                         : const Text(
@@ -225,17 +268,18 @@ class _LoginWidgetState extends State<LoginWidget> {
 
                             const SizedBox(height: 10),
 
-                            TextButton(
-                              onPressed: () {
-                                Navigator.pushReplacementNamed(
-                                  context,
-                                  "/register",
-                                );
-                              },
-                              child: const Text(
-                                "¿No tienes cuenta? Regístrate",
-                              ),
-                            ),
+                            // ✅ REGISTER DESACTIVADO PARA PREDEFENSA
+                            // TextButton(
+                            //   onPressed: () {
+                            //     Navigator.pushReplacementNamed(
+                            //       context,
+                            //       "/register",
+                            //     );
+                            //   },
+                            //   child: const Text(
+                            //     "¿No tienes cuenta? Regístrate",
+                            //   ),
+                            // ),
                           ],
                         ),
                       ),

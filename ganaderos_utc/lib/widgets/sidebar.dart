@@ -25,19 +25,14 @@ class _SidebarState extends State<Sidebar> {
     String? name;
     String? role;
 
-    // Si guardas "user" como JSON, intentamos leerlo
     final rawUser = prefs.getString('user');
+
     if (rawUser != null) {
       try {
         final map = jsonDecode(rawUser);
-        // Ajusta claves según tu JSON real
-        name = (map['name'] ?? map['username'] ?? '').toString().trim();
-        role = (map['role'] ?? '').toString().trim();
-        if (name.isEmpty) name = null;
-        if (role.isEmpty) role = null;
-      } catch (_) {
-        // ignorar si no es JSON válido
-      }
+        name = map['name'];
+        role = map['role'];
+      } catch (_) {}
     }
 
     return _SessionState(isLogged: isLogged, name: name, role: role);
@@ -45,23 +40,24 @@ class _SidebarState extends State<Sidebar> {
 
   Future<void> _logout(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
+
     await prefs.remove('isLoggedIn');
     await prefs.remove('user');
 
     if (!context.mounted) return;
+
     Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false);
   }
 
   Future<void> _goTo(BuildContext context, String route) async {
-    // Cierra drawer primero
     Navigator.pop(context);
 
-    // Pequeño delay para evitar glitches en web/móvil
     await Future.delayed(const Duration(milliseconds: 120));
 
     if (!context.mounted) return;
 
     final current = ModalRoute.of(context)?.settings.name;
+
     if (current != route) {
       Navigator.pushReplacementNamed(context, route);
     }
@@ -70,59 +66,57 @@ class _SidebarState extends State<Sidebar> {
   @override
   Widget build(BuildContext context) {
     return Drawer(
-      child: ConstrainedBox(
-        // ✅ ancho controlado (mejor en web)
-        constraints: const BoxConstraints(maxWidth: 340),
-        child: FutureBuilder<_SessionState>(
-          future: _sessionFuture,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
+      elevation: 10,
+      child: FutureBuilder<_SessionState>(
+        future: _sessionFuture,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
 
-            final session = snapshot.data!;
-            final isLogged = session.isLogged;
+          final session = snapshot.data!;
+          final isLogged = session.isLogged;
 
-            return ListView(
+          return Container(
+            color: const Color(0xFFF4F6F7),
+            child: ListView(
               padding: EdgeInsets.zero,
               children: [
                 _header(session),
 
                 if (isLogged) ...[
-                  _item(context, 'Inicio', '/inicio', Icons.home),
-                  _item(context, 'Haciendas', '/companies', Icons.house_siding),
-                  _item(context, 'Razas', '/breeds', Icons.pets),
-                  _item(context, 'Orígenes', '/origin', Icons.location_on),
-                  _item(context, 'Categorías', '/categories', Icons.category),
-                  _item(context, 'Estadísticas', '/stats', Icons.bar_chart),
-                  _item(context, 'Mapa Haciendas', '/companies-map', Icons.map),
+                  _item(context, "Inicio", '/inicio', Icons.home),
+                  _item(context, "Haciendas", '/companies', Icons.house_siding),
+                  _item(context, "Razas", '/breeds', Icons.pets),
+                  _item(context, "Orígenes", '/origin', Icons.location_on),
+                  _item(context, "Categorías", '/categories', Icons.category),
+                  _item(context, "Estadísticas", '/stats', Icons.bar_chart),
+                  _item(context, "Mapa Haciendas", '/companies-map', Icons.map),
 
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 10),
+
                   const Divider(),
 
+                  const SizedBox(height: 10),
+
                   ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.red),
-                    title: const Text('Cerrar Sesión'),
+                    leading: const Icon(Icons.logout, color: Color(0xFFD32F2F)),
+                    title: const Text(
+                      "Cerrar sesión",
+                      style: TextStyle(fontWeight: FontWeight.w500),
+                    ),
                     onTap: () => _logout(context),
                   ),
                 ],
 
                 if (!isLogged) ...[
-                  ListTile(
-                    leading: const Icon(Icons.login, color: Colors.green),
-                    title: const Text('Iniciar Sesión'),
-                    onTap: () => _goTo(context, '/login'),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.person_add, color: Colors.blue),
-                    title: const Text('Registrarse'),
-                    onTap: () => _goTo(context, '/register'),
-                  ),
+                  _item(context, "Iniciar Sesión", '/login', Icons.login),
+                  //_item(context, "Registrarse", '/register', Icons.person_add),
                 ],
               ],
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -131,46 +125,65 @@ class _SidebarState extends State<Sidebar> {
     return DrawerHeader(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF00EFFF), Color(0xFF1E90FF), Color(0xFFE22B59)],
+          colors: [Color(0xFF1B5E20), Color(0xFF2E7D32), Color(0xFF66BB6A)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
       ),
-      child: Align(
-        alignment: Alignment.bottomLeft,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'UTC GEN APP',
-              style: TextStyle(color: Colors.white, fontSize: 20),
-            ),
-            const SizedBox(height: 6),
 
-            // ✅ extra: info de usuario (si existe)
-            if (session.isLogged) ...[
-              Text(
-                session.name != null
-                    ? 'Hola, ${session.name!}'
-                    : 'Sesión iniciada',
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Row(
+            children: [
+              const CircleAvatar(
+                radius: 26,
+                backgroundColor: Colors.white,
+                child: Icon(Icons.agriculture, color: Color(0xFF2E7D32)),
               ),
-              if (session.role != null)
-                Text(
-                  'Rol: ${session.role!}',
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+
+              const SizedBox(width: 12),
+
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "UTC GEN APP",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    if (session.isLogged)
+                      Text(
+                        session.name ?? "Usuario",
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+
+                    if (session.role != null)
+                      Text(
+                        "Rol: ${session.role}",
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
                 ),
-            ] else ...[
-              const Text(
-                'Accede para ver el menú',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -182,8 +195,14 @@ class _SidebarState extends State<Sidebar> {
     IconData icon,
   ) {
     return ListTile(
-      leading: Icon(icon, color: Colors.blueAccent),
-      title: Text(title),
+      leading: Icon(icon, color: const Color(0xFF2E7D32)),
+
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+
+      hoverColor: const Color(0xFFE8F5E9),
+
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+
       onTap: () => _goTo(context, route),
     );
   }

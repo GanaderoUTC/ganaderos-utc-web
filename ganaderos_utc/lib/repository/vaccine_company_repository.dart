@@ -30,6 +30,7 @@ class VaccineCompanyRepository {
         return false;
       }).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener vacunas por cattleId=$cattleId: $e");
       return [];
     }
@@ -47,10 +48,11 @@ class VaccineCompanyRepository {
       if (response != null) {
         return Vaccine.fromMap(Map<String, dynamic>.from(response));
       }
-
+      // ignore: avoid_print
       print("⚠️ Respuesta inesperada al crear vacuna: $response");
       return null;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear vacuna: $e");
       return null;
     }
@@ -69,10 +71,11 @@ class VaccineCompanyRepository {
       if (response is int) return response > 0;
       if (response is Map && response['success'] == true) return true;
       if (response is Map && response['id'] != null) return true;
-
+      // ignore: avoid_print
       print("⚠️ Respuesta inesperada al actualizar vacuna: $response");
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar vacuna: $e");
       return false;
     }
@@ -88,6 +91,7 @@ class VaccineCompanyRepository {
 
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar vacuna: $e");
       return false;
     }

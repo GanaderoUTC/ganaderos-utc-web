@@ -4,7 +4,7 @@ import '../settings/api_connections.dart';
 class CattleRepository {
   static const String _basePath = "/cattle";
 
-  // Obtener TODO el ganado (sin filtrar empresa)
+  // Obtener todo el ganadoS
   static Future<List<Cattle>> getAll() async {
     try {
       final List<Map<String, dynamic>> dataList = await ApiConnection.get(
@@ -13,6 +13,7 @@ class CattleRepository {
 
       return dataList.map((e) => Cattle.fromMap(e)).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener ganado: $e");
       return [];
     }
@@ -27,6 +28,7 @@ class CattleRepository {
 
       return dataList.map((e) => Cattle.fromMap(e)).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al obtener ganado por empresa: $e");
       return [];
     }
@@ -41,6 +43,7 @@ class CattleRepository {
         return Cattle.fromMap(Map<String, dynamic>.from(response));
       }
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al crear ganado: $e");
     }
     return null;
@@ -61,6 +64,7 @@ class CattleRepository {
 
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al actualizar ganado: $e");
       return false;
     }
@@ -76,6 +80,7 @@ class CattleRepository {
 
       return false;
     } catch (e) {
+      // ignore: avoid_print
       print("❌ Error al eliminar ganado: $e");
       return false;
     }

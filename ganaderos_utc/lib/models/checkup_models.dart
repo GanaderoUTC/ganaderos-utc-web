@@ -15,7 +15,7 @@ class Checkup {
   /// sync: 1 = sincronizado, 0 = no sincronizado
   final int sync;
 
-  // Relaciones anidadas
+  /// Relaciones anidadas
   final Cattle? cattle;
   final Company? company;
 
@@ -34,8 +34,37 @@ class Checkup {
   });
 
   factory Checkup.fromMap(Map<String, dynamic> map) {
-    final c = map['cattle'];
-    final co = map['company'];
+    final dynamic cattleMap = map['cattle'];
+    final dynamic companyMap = map['company'];
+
+    final int parsedCattleId =
+        _asInt(map['cattle_id']) ??
+        _asInt(map['cattleId']) ??
+        (cattleMap is Map ? (_asInt(cattleMap['id']) ?? 0) : 0);
+
+    final int parsedCompanyId =
+        _asInt(map['company_id']) ??
+        _asInt(map['companyId']) ??
+        (companyMap is Map ? (_asInt(companyMap['id']) ?? 0) : 0);
+
+    Cattle? parsedCattle;
+    Company? parsedCompany;
+
+    try {
+      if (cattleMap is Map) {
+        parsedCattle = Cattle.fromMap(Map<String, dynamic>.from(cattleMap));
+      }
+    } catch (_) {
+      parsedCattle = null;
+    }
+
+    try {
+      if (companyMap is Map) {
+        parsedCompany = Company.fromMap(Map<String, dynamic>.from(companyMap));
+      }
+    } catch (_) {
+      parsedCompany = null;
+    }
 
     return Checkup(
       id: _asInt(map['id']),
@@ -44,14 +73,10 @@ class Checkup {
       diagnosis: (map['diagnosis'] ?? '').toString().trim(),
       treatment: (map['treatment'] ?? '').toString().trim(),
       observation: (map['observation'] ?? '').toString().trim(),
-
-      cattleId: _asInt(map['cattle_id']) ?? 0,
-      companyId: _asInt(map['company_id']) ?? 0,
-
-      cattle: c is Map ? Cattle.fromMap(Map<String, dynamic>.from(c)) : null,
-      company:
-          co is Map ? Company.fromMap(Map<String, dynamic>.from(co)) : null,
-
+      cattleId: parsedCattleId,
+      companyId: parsedCompanyId,
+      cattle: parsedCattle,
+      company: parsedCompany,
       sync: _asIntBool(map['sync']),
     );
   }
@@ -70,7 +95,33 @@ class Checkup {
     };
   }
 
-  // ---------------- HELPERS ----------------
+  Checkup copyWith({
+    int? id,
+    String? date,
+    String? symptom,
+    String? diagnosis,
+    String? treatment,
+    String? observation,
+    int? cattleId,
+    int? companyId,
+    int? sync,
+    Cattle? cattle,
+    Company? company,
+  }) {
+    return Checkup(
+      id: id ?? this.id,
+      date: date ?? this.date,
+      symptom: symptom ?? this.symptom,
+      diagnosis: diagnosis ?? this.diagnosis,
+      treatment: treatment ?? this.treatment,
+      observation: observation ?? this.observation,
+      cattleId: cattleId ?? this.cattleId,
+      companyId: companyId ?? this.companyId,
+      sync: sync ?? this.sync,
+      cattle: cattle ?? this.cattle,
+      company: company ?? this.company,
+    );
+  }
 
   static int? _asInt(dynamic v) {
     if (v == null) return null;
@@ -79,7 +130,6 @@ class Checkup {
     return int.tryParse(v.toString().trim());
   }
 
-  /// Convierte true/false, 1/0, "1"/"0", "true"/"false" a int 1/0
   static int _asIntBool(dynamic v) {
     if (v == null) return 0;
     if (v is int) return v == 1 ? 1 : 0;

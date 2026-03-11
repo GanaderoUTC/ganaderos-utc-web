@@ -13,6 +13,11 @@ class OriginView extends StatefulWidget {
 class _OriginViewState extends State<OriginView> {
   final GlobalKey<OriginTableState> _tableKey = GlobalKey<OriginTableState>();
 
+  // ignore: unused_element
+  void _refreshTable() {
+    _tableKey.currentState?.loadOrigins();
+  }
+
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
@@ -28,7 +33,6 @@ class _OriginViewState extends State<OriginView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              /// HEADER
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(
@@ -65,7 +69,6 @@ class _OriginViewState extends State<OriginView> {
 
               const SizedBox(height: 14),
 
-              /// TABLA
               Expanded(
                 child: Card(
                   elevation: 4,
@@ -81,7 +84,6 @@ class _OriginViewState extends State<OriginView> {
 
               const SizedBox(height: 10),
 
-              /// FOOTER SIMPLE
               const Center(
                 child: Text(
                   "© 2025 UTC GEN APP - Todos los derechos reservados",

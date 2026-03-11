@@ -23,11 +23,11 @@ class Company {
   final String? coordinates;
   final String? codeAddress;
 
-  final double surface;
-  final double fertilityPercentage;
-  final double birthRate;
-  final double mortalityRate;
-  final double weaningPercentage;
+  final double? surface;
+  final double? fertilityPercentage;
+  final double? birthRate;
+  final double? mortalityRate;
+  final double? weaningPercentage;
   final double litersOfMilk;
 
   /// ✅ coordenadas separadas
@@ -51,11 +51,11 @@ class Company {
     required this.address,
     this.coordinates,
     this.codeAddress,
-    required this.surface,
-    required this.fertilityPercentage,
-    required this.birthRate,
-    required this.mortalityRate,
-    required this.weaningPercentage,
+    this.surface,
+    this.fertilityPercentage,
+    this.birthRate,
+    this.mortalityRate,
+    this.weaningPercentage,
     required this.litersOfMilk,
     this.lat,
     this.lng,
@@ -108,8 +108,8 @@ class Company {
       'email': email,
       'parish': parish,
       'city': city,
-      'quarter': quarter,
-      'neighborhood': neighborhood,
+      'quarter': _nullIfEmpty(quarter),
+      'neighborhood': _nullIfEmpty(neighborhood),
       'address': address,
 
       /// ✅ se manda al API como texto "lat,lng"
@@ -157,11 +157,11 @@ class Company {
       address: _asString(data['address'], fallback: ''),
       coordinates: coordsRaw,
       codeAddress: _asNullableString(data['code_address']),
-      surface: _asDouble(data['surface']),
-      fertilityPercentage: _asDouble(data['fertility_percentage']),
-      birthRate: _asDouble(data['birth_rate']),
-      mortalityRate: _asDouble(data['mortality_rate']),
-      weaningPercentage: _asDouble(data['weaning_percentage']),
+      surface: _asNullableDouble(data['surface']),
+      fertilityPercentage: _asNullableDouble(data['fertility_percentage']),
+      birthRate: _asNullableDouble(data['birth_rate']),
+      mortalityRate: _asNullableDouble(data['mortality_rate']),
+      weaningPercentage: _asNullableDouble(data['weaning_percentage']),
       litersOfMilk: _asDouble(data['liters_of_milk']),
       observation: _asNullableString(data['observation']),
       lat: lat,
@@ -231,11 +231,13 @@ class Company {
       contact: "",
       email: "",
       address: "",
-      surface: 0,
-      fertilityPercentage: 0,
-      birthRate: 0,
-      mortalityRate: 0,
-      weaningPercentage: 0,
+      quarter: null,
+      neighborhood: null,
+      surface: null,
+      fertilityPercentage: null,
+      birthRate: null,
+      mortalityRate: null,
+      weaningPercentage: null,
       litersOfMilk: 0,
     );
   }
@@ -262,7 +264,9 @@ class Company {
     if (v is double) return v;
     if (v is int) return v.toDouble();
     if (v is num) return v.toDouble();
-    return double.tryParse(v.toString().trim());
+    final text = v.toString().trim();
+    if (text.isEmpty) return null;
+    return double.tryParse(text);
   }
 
   static String _asString(dynamic v, {String fallback = ''}) {
@@ -275,6 +279,12 @@ class Company {
     if (v == null) return null;
     final s = v.toString().trim();
     return s.isEmpty ? null : s;
+  }
+
+  static String? _nullIfEmpty(String? v) {
+    if (v == null) return null;
+    final text = v.trim();
+    return text.isEmpty ? null : text;
   }
 
   /// ✅ soporta "lat,lng" o "lat lng" o "lat;lng"

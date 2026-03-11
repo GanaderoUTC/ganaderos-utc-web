@@ -21,20 +21,67 @@ class DashboardSummary {
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
     return DashboardSummary(
-      totalCattle: _asInt(_pick(json, ['totalCattle', 'total_cattle'])),
-      totalCompanies: _asInt(
-        _pick(json, ['totalCompanies', 'total_companies']),
+      totalCattle: _asInt(
+        _pick(json, [
+          'totalCattle',
+          'total_cattle',
+          'cattleTotal',
+          'cattle_total',
+        ]),
       ),
-      totalUsers: _asInt(_pick(json, ['totalUsers', 'total_users'])),
-      totalCheckups: _asInt(_pick(json, ['totalCheckups', 'total_checkups'])),
-      totalVaccines: _asInt(_pick(json, ['totalVaccines', 'total_vaccines'])),
+      totalCompanies: _asInt(
+        _pick(json, [
+          'totalCompanies',
+          'total_companies',
+          'companiesTotal',
+          'companies_total',
+        ]),
+      ),
+      totalUsers: _asInt(
+        _pick(json, ['totalUsers', 'total_users', 'usersTotal', 'users_total']),
+      ),
+      totalCheckups: _asInt(
+        _pick(json, [
+          'totalCheckups',
+          'total_checkups',
+          'checkupsTotal',
+          'checkups_total',
+        ]),
+      ),
+      totalVaccines: _asInt(
+        _pick(json, [
+          'totalVaccines',
+          'total_vaccines',
+          'vaccinesTotal',
+          'vaccines_total',
+        ]),
+      ),
       milkTodayLitres: _asDouble(
-        _pick(json, ['milkTodayLitres', 'milk_today_litres']),
+        _pick(json, [
+          'milkTodayLitres',
+          'milk_today_litres',
+          'milkToday',
+          'milk_today',
+          'todayMilk',
+        ]),
       ),
       milkMonthLitres: _asDouble(
-        _pick(json, ['milkMonthLitres', 'milk_month_litres']),
+        _pick(json, [
+          'milkMonthLitres',
+          'milk_month_litres',
+          'milkMonth',
+          'milk_month',
+          'monthMilk',
+        ]),
       ),
-      avgWeight: _asDouble(_pick(json, ['avgWeight', 'avg_weight'])),
+      avgWeight: _asDouble(
+        _pick(json, [
+          'avgWeight',
+          'avg_weight',
+          'averageWeight',
+          'average_weight',
+        ]),
+      ),
     );
   }
 }
@@ -47,13 +94,17 @@ class AvgWeightByCattleItem {
 
   factory AvgWeightByCattleItem.fromJson(Map<String, dynamic> json) {
     return AvgWeightByCattleItem(
-      cattleName: _asString(_pick(json, ['cattleName', 'cattle_name', 'name'])),
-      avgWeight: _asDouble(_pick(json, ['avgWeight', 'avg_weight', 'weight'])),
+      cattleName: _asString(
+        _pick(json, ['cattleName', 'cattle_name', 'name', 'cattle']),
+      ),
+      avgWeight: _asDouble(
+        _pick(json, ['avgWeight', 'avg_weight', 'weight', 'averageWeight']),
+      ),
     );
   }
 }
 
-/// PRODUCCIÓN DE LECHE (COLLECTIONS)
+/// PRODUCCIÓN DE LECHE / RECOLECCIONES
 class MilkDayItem {
   final int collectionId;
   final int cattleId;
@@ -70,14 +121,32 @@ class MilkDayItem {
   });
 
   factory MilkDayItem.fromJson(Map<String, dynamic> json) {
-    final rawDate = _pick(json, ['date', 'day', 'created_at']);
+    final rawDate = _pick(json, [
+      'date',
+      'day',
+      'collection_date',
+      'created_at',
+      'updated_at',
+    ]);
 
     return MilkDayItem(
-      collectionId: _asInt(_pick(json, ['id', 'collection_id'])),
+      collectionId: _asInt(
+        _pick(json, ['id', 'collection_id', 'collectionId']),
+      ),
       cattleId: _asInt(_pick(json, ['cattleId', 'cattle_id'])),
       companyId: _asInt(_pick(json, ['companyId', 'company_id'])),
       date: _asDate(rawDate),
-      litres: _asDouble(_pick(json, ['litres', 'liters', 'milk', 'value'])),
+      litres: _asDouble(
+        _pick(json, [
+          'litres',
+          'liters',
+          'milk',
+          'milk_litres',
+          'milk_liters',
+          'value',
+          'total',
+        ]),
+      ),
     );
   }
 }
@@ -91,7 +160,22 @@ class CattleByCategoryItem {
   factory CattleByCategoryItem.fromJson(Map<String, dynamic> json) {
     return CattleByCategoryItem(
       category: _asString(_pick(json, ['category', 'category_name', 'name'])),
-      count: _asInt(_pick(json, ['count', 'total'])),
+      count: _asInt(_pick(json, ['count', 'total', 'value'])),
+    );
+  }
+}
+
+/// NUEVO: GANADO POR RAZA (PARA GRÁFICO PASTEL)
+class CattleByBreedItem {
+  final String breed;
+  final int count;
+
+  CattleByBreedItem({required this.breed, required this.count});
+
+  factory CattleByBreedItem.fromJson(Map<String, dynamic> json) {
+    return CattleByBreedItem(
+      breed: _asString(_pick(json, ['breed', 'breed_name', 'name'])),
+      count: _asInt(_pick(json, ['count', 'total', 'value'])),
     );
   }
 }
@@ -101,12 +185,14 @@ class DashboardStatsResponse {
   final List<MilkDayItem> milkByDay;
   final List<CattleByCategoryItem> cattleByCategory;
   final List<AvgWeightByCattleItem> avgWeightByCattle;
+  final List<CattleByBreedItem> cattleByBreed;
 
   DashboardStatsResponse({
     required this.summary,
     required this.milkByDay,
     required this.cattleByCategory,
     required this.avgWeightByCattle,
+    required this.cattleByBreed,
   });
 
   factory DashboardStatsResponse.fromJson(Map<String, dynamic> json) {
@@ -115,14 +201,38 @@ class DashboardStatsResponse {
             ? (json['data'] as Map<String, dynamic>)
             : json;
 
-    final milkRaw = _pick(root, ['milkByDay', 'milk_by_day']) as List? ?? [];
+    final milkRaw = _asList(
+      _pick(root, [
+        'milkByDay',
+        'milk_by_day',
+        'milkCollections',
+        'milk_collections',
+        'collections',
+      ]),
+    );
 
-    final catRaw =
-        _pick(root, ['cattleByCategory', 'cattle_by_category']) as List? ?? [];
+    final catRaw = _asList(
+      _pick(root, ['cattleByCategory', 'cattle_by_category', 'categories']),
+    );
 
-    final wRaw =
-        _pick(root, ['avgWeightByCattle', 'avg_weight_by_cattle']) as List? ??
-        [];
+    final wRaw = _asList(
+      _pick(root, [
+        'avgWeightByCattle',
+        'avg_weight_by_cattle',
+        'weightByCattle',
+        'weight_by_cattle',
+      ]),
+    );
+
+    final breedRaw = _asList(
+      _pick(root, [
+        'cattleByBreed',
+        'cattle_by_breed',
+        'breeds',
+        'breedStats',
+        'breed_stats',
+      ]),
+    );
 
     return DashboardStatsResponse(
       summary: DashboardSummary.fromJson(
@@ -150,6 +260,11 @@ class DashboardStatsResponse {
                     AvgWeightByCattleItem.fromJson(e.cast<String, dynamic>()),
               )
               .toList(),
+      cattleByBreed:
+          breedRaw
+              .whereType<Map>()
+              .map((e) => CattleByBreedItem.fromJson(e.cast<String, dynamic>()))
+              .toList(),
     );
   }
 }
@@ -158,9 +273,17 @@ class DashboardStatsResponse {
 
 dynamic _pick(Map<String, dynamic> json, List<String> keys) {
   for (final k in keys) {
-    if (json.containsKey(k) && json[k] != null) return json[k];
+    if (json.containsKey(k) && json[k] != null) {
+      return json[k];
+    }
   }
   return null;
+}
+
+List<dynamic> _asList(dynamic v) {
+  if (v == null) return [];
+  if (v is List) return v;
+  return [];
 }
 
 int _asInt(dynamic v) {
@@ -173,8 +296,11 @@ int _asInt(dynamic v) {
 double _asDouble(dynamic v) {
   if (v == null) return 0.0;
   if (v is double) return v;
+  if (v is int) return v.toDouble();
   if (v is num) return v.toDouble();
-  return double.tryParse(v.toString().trim().replaceAll(',', '.')) ?? 0.0;
+
+  final value = v.toString().trim().replaceAll(',', '.');
+  return double.tryParse(value) ?? 0.0;
 }
 
 String _asString(dynamic v) {

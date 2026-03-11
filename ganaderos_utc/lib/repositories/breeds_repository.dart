@@ -10,6 +10,7 @@ class BreedsRepository {
       final List<dynamic> dataList = await ApiConnection.get(endpoint);
       return dataList.map((data) => Breed.fromMap(data)).toList();
     } catch (e) {
+      // ignore: avoid_print
       print("Error al obtener razas: $e");
       return [];
     }
@@ -23,6 +24,7 @@ class BreedsRepository {
         return Breed.fromMap(response);
       }
     } catch (e) {
+      // ignore: avoid_print
       print("Error al crear raza: $e");
     }
     return null;
@@ -39,6 +41,7 @@ class BreedsRepository {
       // ignore: unnecessary_null_comparison
       return response != null;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al actualizar raza: $e");
       return false;
     }
@@ -51,6 +54,7 @@ class BreedsRepository {
       // ignore: unnecessary_null_comparison
       return response != null;
     } catch (e) {
+      // ignore: avoid_print
       print("Error al eliminar raza: $e");
       return false;
     }

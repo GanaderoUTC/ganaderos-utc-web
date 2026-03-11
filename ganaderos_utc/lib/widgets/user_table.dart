@@ -5,7 +5,10 @@ import '../views/user_view/user_form.dart';
 import '../views/companies_view/companies_view.dart';
 
 class UserTable extends StatefulWidget {
-  const UserTable({super.key});
+  final VoidCallback? onReload;
+  final VoidCallback? onBack;
+
+  const UserTable({super.key, this.onReload, this.onBack});
 
   @override
   UserTableState createState() => UserTableState();
@@ -13,6 +16,7 @@ class UserTable extends StatefulWidget {
 
 class UserTableState extends State<UserTable> {
   final UserRepository repository = UserRepository();
+
   List<User> users = [];
   bool isLoading = true;
 
@@ -25,12 +29,8 @@ class UserTableState extends State<UserTable> {
     loadUsers();
   }
 
-  /// Cargar lista de usuarios
   Future<void> loadUsers() async {
-    if (!mounted) return;
-
     setState(() => isLoading = true);
-
     try {
       final data = await UserRepository.getAll();
       if (!mounted) return;
@@ -42,15 +42,14 @@ class UserTableState extends State<UserTable> {
       });
     } catch (e) {
       if (!mounted) return;
-      setState(() => isLoading = false);
 
+      setState(() => isLoading = false);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text("Error al cargar usuarios: $e")));
+      ).showSnackBar(SnackBar(content: Text('Error al cargar usuarios: $e')));
     }
   }
 
-  /// Agregar usuario
   Future<void> _addUser() async {
     final result = await showDialog<bool>(
       context: context,
@@ -60,10 +59,10 @@ class UserTableState extends State<UserTable> {
 
     if (mounted && result == true) {
       await loadUsers();
+      widget.onReload?.call();
     }
   }
 
-  /// Editar usuario
   Future<void> _editUser(User user) async {
     final result = await showDialog<bool>(
       context: context,
@@ -73,10 +72,10 @@ class UserTableState extends State<UserTable> {
 
     if (mounted && result == true) {
       await loadUsers();
+      widget.onReload?.call();
     }
   }
 
-  /// Eliminar usuario
   Future<void> _deleteUser(int id) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -85,17 +84,23 @@ class UserTableState extends State<UserTable> {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
-            title: const Text("Eliminar usuario"),
-            content: const Text("¿Seguro que deseas eliminar este usuario?"),
+            title: const Text('Eliminar usuario'),
+            content: const Text('¿Seguro que deseas eliminar este usuario?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text("Cancelar"),
+                child: const Text(
+                  'Cancelar',
+                  style: TextStyle(color: Colors.red),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                child: const Text("Eliminar"),
+                child: const Text(
+                  'Eliminar',
+                  style: TextStyle(color: Colors.white),
+                ),
               ),
             ],
           ),
@@ -103,43 +108,356 @@ class UserTableState extends State<UserTable> {
 
     if (confirm == true) {
       final success = await repository.delete(id);
+
       if (!mounted) return;
 
       if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Usuario eliminado correctamente")),
+          const SnackBar(content: Text('Usuario eliminado correctamente')),
         );
         await loadUsers();
+        widget.onReload?.call();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("No se pudo eliminar el usuario")),
+          const SnackBar(content: Text('No se pudo eliminar el usuario')),
         );
       }
     }
   }
 
-  /// Paginación segura
   List<User> get paginatedData {
-    if (users.isEmpty) return [];
     final start = (currentPage - 1) * rowsPerPage;
-    if (start >= users.length) return [];
-    final end = (start + rowsPerPage).clamp(0, users.length);
-    return users.sublist(start, end);
+    final end = start + rowsPerPage;
+
+    if (users.isEmpty || start >= users.length) return [];
+
+    return users.sublist(start, end > users.length ? users.length : end);
   }
 
   int get totalPages => users.isEmpty ? 1 : (users.length / rowsPerPage).ceil();
 
-  void goToPage(int page) {
-    if (!mounted) return;
-    if (page < 1 || page > totalPages) return;
-    setState(() => currentPage = page);
+  void goToPage(int page) => setState(() => currentPage = page);
+
+  String _getCompanyText(User user) {
+    final companyName = user.company?.companyName.trim() ?? '';
+
+    if (companyName.isNotEmpty) {
+      return companyName;
+    } else if (user.companyId != null && user.companyId! > 0) {
+      return 'Empresa #${user.companyId}';
+    }
+
+    return 'Sin empresa';
+  }
+
+  Widget _buildActionBar() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.92),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Wrap(
+        spacing: 10,
+        runSpacing: 10,
+        children: [
+          ElevatedButton.icon(
+            icon: const Icon(Icons.arrow_back),
+            label: const Text('Regresar a empresas'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.grey.shade800,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed:
+                widget.onBack ??
+                () {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CompaniesView()),
+                  );
+                },
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.add),
+            label: const Text('Agregar usuario'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: _addUser,
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.refresh),
+            label: const Text('Recargar'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: loadUsers,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTable(BoxConstraints constraints) {
+    if (users.isEmpty) {
+      return Expanded(
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.95),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.grey.shade300),
+          ),
+          child: const Center(
+            child: Text(
+              'No hay registros de usuarios.',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.black54,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Expanded(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.95),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.10),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.vertical,
+                child: DataTable(
+                  headingRowHeight: 54,
+                  dataRowMinHeight: 56,
+                  dataRowMaxHeight: 68,
+                  columnSpacing: 24,
+                  horizontalMargin: 16,
+                  headingRowColor: WidgetStateProperty.all(
+                    const Color(0xFF1F2937),
+                  ),
+                  headingTextStyle: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                  dataRowColor: WidgetStateProperty.resolveWith<Color?>(
+                    (states) => Colors.white,
+                  ),
+                  columns: const [
+                    DataColumn(label: Text('ID')),
+                    DataColumn(label: Text('Nombre')),
+                    DataColumn(label: Text('Apellido')),
+                    DataColumn(label: Text('Correo')),
+                    DataColumn(label: Text('Cédula')),
+                    DataColumn(label: Text('Empresa')),
+                    DataColumn(label: Text('Acciones')),
+                  ],
+                  rows:
+                      paginatedData.map((user) {
+                        return DataRow(
+                          cells: [
+                            DataCell(Text(user.id?.toString() ?? '-')),
+                            DataCell(
+                              SizedBox(
+                                width: 150,
+                                child: Text(
+                                  user.name.trim().isNotEmpty ? user.name : '-',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              SizedBox(
+                                width: 150,
+                                child: Text(
+                                  user.lastName.trim().isNotEmpty
+                                      ? user.lastName
+                                      : '-',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              SizedBox(
+                                width: 220,
+                                child: Text(
+                                  (user.email ?? '').trim().isNotEmpty
+                                      ? user.email!
+                                      : '-',
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Text(
+                                (user.dni ?? '').trim().isNotEmpty
+                                    ? user.dni!
+                                    : '-',
+                              ),
+                            ),
+                            DataCell(
+                              SizedBox(
+                                width: 180,
+                                child: Text(
+                                  _getCompanyText(user),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 2,
+                                ),
+                              ),
+                            ),
+                            DataCell(
+                              Row(
+                                children: [
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.withOpacity(0.10),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.edit,
+                                        color: Colors.blue,
+                                      ),
+                                      tooltip: 'Editar usuario',
+                                      onPressed: () => _editUser(user),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withOpacity(0.10),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: IconButton(
+                                      icon: const Icon(
+                                        Icons.delete,
+                                        color: Colors.red,
+                                      ),
+                                      tooltip: 'Eliminar usuario',
+                                      onPressed:
+                                          user.id != null
+                                              ? () => _deleteUser(user.id!)
+                                              : null,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPagination() {
+    if (totalPages <= 1) return const SizedBox.shrink();
+
+    final List<Widget> pageButtons = [];
+
+    pageButtons.add(
+      OutlinedButton(
+        onPressed: currentPage > 1 ? () => goToPage(currentPage - 1) : null,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          side: BorderSide(color: Colors.grey.shade400),
+        ),
+        child: const Text('Anterior'),
+      ),
+    );
+
+    for (int i = 1; i <= totalPages; i++) {
+      pageButtons.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: OutlinedButton(
+            style: OutlinedButton.styleFrom(
+              backgroundColor:
+                  i == currentPage ? const Color(0xFF1F2937) : Colors.white,
+              foregroundColor: i == currentPage ? Colors.white : Colors.black87,
+              side: BorderSide(color: Colors.grey.shade400),
+            ),
+            onPressed: () => goToPage(i),
+            child: Text('$i'),
+          ),
+        ),
+      );
+    }
+
+    pageButtons.add(
+      OutlinedButton(
+        onPressed:
+            currentPage < totalPages ? () => goToPage(currentPage + 1) : null,
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black87,
+          side: BorderSide(color: Colors.grey.shade400),
+        ),
+        child: const Text('Siguiente'),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: pageButtons,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final w = MediaQuery.of(context).size.width;
-    final bool isMobile = w < 700;
-
     if (isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -147,7 +465,9 @@ class UserTableState extends State<UserTable> {
     return LayoutBuilder(
       builder: (_, constraints) {
         return Container(
-          padding: EdgeInsets.all(isMobile ? 12 : 16),
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
             image: DecorationImage(
               image: AssetImage('assets/images/fondo1.jpg'),
@@ -157,384 +477,15 @@ class UserTableState extends State<UserTable> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              /// ✅ Barra superior responsive (móvil: botones full width)
-              if (isMobile) ...[
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text("Agregar Usuario"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6EDB44),
-                      foregroundColor: Colors.black87,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: _addUser,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.refresh),
-                    label: const Text("Recargar"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFD2E735),
-                      foregroundColor: Colors.black87,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: loadUsers,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.arrow_back),
-                    label: const Text("Regresar a Empresas"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueGrey,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const CompaniesView(),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ] else ...[
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.spaceBetween,
-                  children: [
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.add),
-                          label: const Text("Agregar Usuario"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF6EDB44),
-                            foregroundColor: Colors.black87,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: _addUser,
-                        ),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.refresh),
-                          label: const Text("Recargar"),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFD2E735),
-                            foregroundColor: Colors.black87,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          onPressed: loadUsers,
-                        ),
-                      ],
-                    ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.arrow_back),
-                      label: const Text("Regresar a Empresas"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueGrey,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 12,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const CompaniesView(),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                ),
-              ],
-
-              const SizedBox(height: 12),
-
-              /// ✅ Tabla responsive
-              Expanded(
-                child:
-                    users.isEmpty
-                        ? const Center(
-                          child: Text(
-                            "No hay registros de usuarios.",
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.black54,
-                            ),
-                          ),
-                        )
-                        : _buildTable(constraints, isMobile),
-              ),
-
+              _buildActionBar(),
+              const SizedBox(height: 16),
+              _buildTable(constraints),
               const SizedBox(height: 10),
-              _buildPagination(isMobile),
+              _buildPagination(),
             ],
           ),
         );
       },
     );
-  }
-
-  Widget _buildTable(BoxConstraints constraints, bool isMobile) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(minWidth: constraints.maxWidth),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.90),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.18),
-                  blurRadius: 10,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: DataTable(
-              columnSpacing: isMobile ? 18 : 40,
-              headingRowColor: WidgetStateProperty.all(
-                Colors.black.withOpacity(0.85),
-              ),
-              headingTextStyle: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-              dataRowMinHeight: isMobile ? 48 : 56,
-              dataRowMaxHeight: isMobile ? 76 : 86,
-              columns: const [
-                DataColumn(label: Text("ID")),
-                DataColumn(label: Text("Nombre")),
-                DataColumn(label: Text("Apellido")),
-                DataColumn(label: Text("Email")),
-                DataColumn(label: Text("DNI")),
-                DataColumn(label: Text("Empresa")),
-                DataColumn(label: Text("Acciones")),
-              ],
-              rows:
-                  paginatedData.map((user) {
-                    final empresaTexto =
-                        user.company?.companyName ??
-                        (user.companyId != null
-                            ? "Empresa #${user.companyId}"
-                            : "Sin empresa");
-
-                    return DataRow(
-                      cells: [
-                        DataCell(Text(user.id?.toString() ?? "-")),
-                        DataCell(
-                          SizedBox(
-                            width: isMobile ? 140 : 180,
-                            child: Text(
-                              user.name,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          SizedBox(
-                            width: isMobile ? 140 : 180,
-                            child: Text(
-                              user.lastName.isEmpty
-                                  ? "(Sin apellido)"
-                                  : user.lastName,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          SizedBox(
-                            width: isMobile ? 190 : 260,
-                            child: Text(
-                              user.email ?? "N/A",
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                        DataCell(Text(user.dni ?? "N/A")),
-                        DataCell(
-                          SizedBox(
-                            width: isMobile ? 160 : 240,
-                            child: Text(
-                              empresaTexto,
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-
-                        /// ✅ Acciones: en móvil => menú ⋮, en desktop => iconos
-                        DataCell(
-                          isMobile
-                              ? PopupMenuButton<String>(
-                                tooltip: "Acciones",
-                                onSelected: (v) async {
-                                  if (v == "edit") await _editUser(user);
-                                  if (v == "delete" && user.id != null) {
-                                    await _deleteUser(user.id!);
-                                  }
-                                },
-                                itemBuilder:
-                                    (_) => [
-                                      const PopupMenuItem(
-                                        value: "edit",
-                                        child: Text("Editar"),
-                                      ),
-                                      PopupMenuItem(
-                                        value: "delete",
-                                        enabled: user.id != null,
-                                        child: const Text("Eliminar"),
-                                      ),
-                                    ],
-                                child: const Icon(Icons.more_vert),
-                              )
-                              : Row(
-                                children: [
-                                  IconButton(
-                                    tooltip: "Editar",
-                                    icon: const Icon(
-                                      Icons.edit,
-                                      color: Colors.blue,
-                                    ),
-                                    onPressed: () => _editUser(user),
-                                  ),
-                                  IconButton(
-                                    tooltip: "Eliminar",
-                                    icon: const Icon(
-                                      Icons.delete,
-                                      color: Colors.red,
-                                    ),
-                                    onPressed:
-                                        user.id != null
-                                            ? () => _deleteUser(user.id!)
-                                            : null,
-                                  ),
-                                ],
-                              ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// ✅ Paginación responsive (móvil muestra menos botones)
-  Widget _buildPagination(bool isMobile) {
-    if (totalPages <= 1) return const SizedBox.shrink();
-
-    final pagesToShow = _pagesWindow(
-      current: currentPage,
-      total: totalPages,
-      maxButtons: isMobile ? 5 : 10,
-    );
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          OutlinedButton(
-            onPressed: currentPage > 1 ? () => goToPage(currentPage - 1) : null,
-            child: const Text("Anterior"),
-          ),
-          const SizedBox(width: 8),
-          ...pagesToShow.map((p) {
-            final selected = p == currentPage;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  backgroundColor:
-                      selected ? Colors.black87 : Colors.white.withOpacity(0.8),
-                  foregroundColor: selected ? Colors.white : Colors.black,
-                ),
-                onPressed: () => goToPage(p),
-                child: Text("$p"),
-              ),
-            );
-          }),
-          const SizedBox(width: 8),
-          OutlinedButton(
-            onPressed:
-                currentPage < totalPages
-                    ? () => goToPage(currentPage + 1)
-                    : null,
-            child: const Text("Siguiente"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  List<int> _pagesWindow({
-    required int current,
-    required int total,
-    required int maxButtons,
-  }) {
-    if (total <= maxButtons) return List.generate(total, (i) => i + 1);
-
-    final half = maxButtons ~/ 2;
-    int start = current - half;
-    int end = current + half;
-
-    if (start < 1) {
-      start = 1;
-      end = maxButtons;
-    }
-    if (end > total) {
-      end = total;
-      start = total - maxButtons + 1;
-    }
-
-    return [for (int i = start; i <= end; i++) i];
   }
 }

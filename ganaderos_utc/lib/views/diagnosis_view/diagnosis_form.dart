@@ -3,7 +3,7 @@ import '../../models/diagnosis_models.dart';
 import '../../repositories/diagnosis_repository.dart';
 
 class DiagnosisForm extends StatefulWidget {
-  final Diagnosis? diagnosis; // null = nuevo
+  final Diagnosis? diagnosis;
   final VoidCallback onSave;
 
   const DiagnosisForm({super.key, this.diagnosis, required this.onSave});
@@ -25,6 +25,7 @@ class _DiagnosisFormState extends State<DiagnosisForm> {
   @override
   void initState() {
     super.initState();
+
     if (widget.diagnosis != null) {
       _nameController.text = widget.diagnosis!.name;
       _descriptionController.text = widget.diagnosis!.description;
@@ -39,65 +40,157 @@ class _DiagnosisFormState extends State<DiagnosisForm> {
     super.dispose();
   }
 
-  String? _validateName(String? v) {
-    if (v == null || v.trim().isEmpty) return 'El nombre es obligatorio';
-    final s = v.trim();
-    if (s.length < 3) return 'Mínimo 3 caracteres';
-    if (s.length > 60) return 'Máximo 60 caracteres';
+  String _normalizeSpaces(String text) {
+    return text.trim().replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  String _capitalize(String text) {
+    final clean = _normalizeSpaces(text);
+    if (clean.isEmpty) return clean;
+    return clean[0].toUpperCase() + clean.substring(1).toLowerCase();
+  }
+
+  String? _validateName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return "El nombre es obligatorio";
+    }
+
+    final name = _normalizeSpaces(value);
+
+    if (name.length < 3) {
+      return "Mínimo 3 caracteres";
+    }
+
+    if (name.length > 60) {
+      return "Máximo 60 caracteres";
+    }
+
+    if (!RegExp(r'^[A-Za-zÁÉÍÓÚáéíóúñÑ ]+$').hasMatch(name)) {
+      return "Solo se permiten letras";
+    }
+
     return null;
   }
 
-  String? _validateDescription(String? v) {
-    if (v == null || v.trim().isEmpty) return null; // opcional
-    if (v.trim().length > 250) return 'Descripción muy larga (máx. 250)';
+  String? _validateDescription(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return null;
+    }
+
+    final description = _normalizeSpaces(value);
+
+    if (description.length < 5) {
+      return "La descripción es muy corta";
+    }
+
+    if (description.length > 250) {
+      return "Máximo 250 caracteres";
+    }
+
     return null;
   }
 
   Future<void> _saveForm() async {
     if (_saving) return;
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _saving = true);
 
-    final newDiagnosis = Diagnosis(
-      id: widget.diagnosis?.id,
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim(),
-      sync: _sync,
-    );
-
     try {
-      if (widget.diagnosis == null) {
-        await DiagnosisRepository.insertDiagnosis(newDiagnosis);
-      } else {
-        await DiagnosisRepository.updateDiagnosis(newDiagnosis);
+      final formattedName = _capitalize(_nameController.text);
+      final formattedDescription =
+          _descriptionController.text.trim().isEmpty
+              ? ''
+              : _capitalize(_descriptionController.text);
+
+      final allDiagnosis = await DiagnosisRepository.getAll();
+
+      for (final d in allDiagnosis) {
+        final sameRecord = widget.diagnosis?.id == d.id;
+
+        if (!sameRecord) {
+          final existingName = _normalizeSpaces(d.name).toLowerCase();
+          final newName = _normalizeSpaces(formattedName).toLowerCase();
+
+          if (existingName == newName) {
+            if (!mounted) return;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text("El nombre del diagnóstico ya existe"),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+
+            setState(() => _saving = false);
+            return;
+          }
+
+          final existingDescription =
+              _normalizeSpaces(d.description).toLowerCase();
+
+          final newDescription =
+              _normalizeSpaces(formattedDescription).toLowerCase();
+
+          if (formattedDescription.isNotEmpty &&
+              existingDescription == newDescription) {
+            if (!mounted) return;
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text("La descripción ya existe"),
+                backgroundColor: Colors.red.shade700,
+              ),
+            );
+
+            setState(() => _saving = false);
+            return;
+          }
+        }
       }
 
-      widget.onSave();
+      final diagnosis = Diagnosis(
+        id: widget.diagnosis?.id,
+        name: formattedName,
+        description: formattedDescription,
+        sync: _sync,
+      );
+
+      if (widget.diagnosis == null) {
+        await DiagnosisRepository.insertDiagnosis(diagnosis);
+      } else {
+        await DiagnosisRepository.updateDiagnosis(diagnosis);
+      }
 
       if (!mounted) return;
+
       Navigator.pop(context);
+      widget.onSave();
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             widget.diagnosis == null
-                ? 'Diagnóstico registrado correctamente'
-                : 'Diagnóstico actualizado correctamente',
+                ? "Diagnóstico registrado correctamente"
+                : "Diagnóstico actualizado correctamente",
           ),
           backgroundColor: Colors.green.shade700,
         ),
       );
     } catch (e) {
       if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al guardar: $e'),
+          content: Text("Error al guardar: $e"),
           backgroundColor: Colors.red.shade700,
         ),
       );
     } finally {
-      if (mounted) setState(() => _saving = false);
+      if (mounted) {
+        setState(() => _saving = false);
+      }
     }
   }
 
@@ -105,6 +198,9 @@ class _DiagnosisFormState extends State<DiagnosisForm> {
   Widget build(BuildContext context) {
     final w = MediaQuery.of(context).size.width;
     final isMobile = w < 600;
+
+    final dialogWidth = isMobile ? w * 0.92 : 480.0;
+    final maxH = MediaQuery.of(context).size.height * 0.65;
 
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -115,71 +211,68 @@ class _DiagnosisFormState extends State<DiagnosisForm> {
           color: Color(0xFF2C3E50),
         ),
       ),
-
-      // ✅ RESPONSIVE: limita ancho/alto y permite scroll en móvil web
-      content: LayoutBuilder(
-        builder: (context, constraints) {
-          final dialogWidth = isMobile ? w * 0.92 : 480.0;
-          final maxH = MediaQuery.of(context).size.height * 0.65;
-
-          return ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: dialogWidth, maxHeight: maxH),
-            child: SingleChildScrollView(
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Nombre
-                    TextFormField(
-                      controller: _nameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Nombre del diagnóstico',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.medical_services_outlined),
-                      ),
-                      validator: _validateName,
+      content: SizedBox(
+        width: dialogWidth,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: maxH),
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextFormField(
+                    controller: _nameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nombre del diagnóstico',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.medical_services_outlined),
                     ),
-                    const SizedBox(height: 15),
-
-                    // Descripción
-                    TextFormField(
-                      controller: _descriptionController,
-                      decoration: const InputDecoration(
-                        labelText: 'Descripción',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.description_outlined),
-                      ),
-                      maxLines: 3,
-                      validator: _validateDescription,
+                    textCapitalization: TextCapitalization.sentences,
+                    validator: _validateName,
+                  ),
+                  const SizedBox(height: 15),
+                  TextFormField(
+                    controller: _descriptionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripción',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.description_outlined),
                     ),
-                    const SizedBox(height: 12),
-
-                    // Sync
-                    CheckboxListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text('Sincronizado'),
-                      value: _sync,
-                      onChanged:
-                          _saving
-                              ? null
-                              : (value) =>
-                                  setState(() => _sync = value ?? false),
-                      activeColor: Colors.green.shade700,
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                  ],
-                ),
+                    textCapitalization: TextCapitalization.sentences,
+                    maxLines: 3,
+                    validator: _validateDescription,
+                  ),
+                  const SizedBox(height: 12),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Sincronizado'),
+                    value: _sync,
+                    onChanged:
+                        _saving
+                            ? null
+                            : (value) => setState(() => _sync = value ?? false),
+                    activeColor: Colors.green.shade700,
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                ],
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
-
       actions: [
-        TextButton(
+        ElevatedButton.icon(
           onPressed: _saving ? null : () => Navigator.pop(context),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.red)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red.shade700,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+          icon: const Icon(Icons.cancel, color: Colors.white),
+          label: const Text('Cancelar', style: TextStyle(color: Colors.white)),
         ),
         ElevatedButton.icon(
           onPressed: _saving ? null : _saveForm,
@@ -195,7 +288,10 @@ class _DiagnosisFormState extends State<DiagnosisForm> {
                   ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                   : const Icon(Icons.save, color: Colors.white),
           label: Text(

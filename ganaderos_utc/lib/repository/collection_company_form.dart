@@ -6,7 +6,7 @@ import '../../repositories/cattle_repository.dart';
 
 class CollectionCattleForm extends StatefulWidget {
   final Collection? collection;
-  final int cattleId; // Cattle fijo
+  final int cattleId;
   final VoidCallback onSave;
 
   const CollectionCattleForm({
@@ -34,35 +34,37 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
   bool _isLoading = false;
   bool get _isEditing => widget.collection != null;
 
-  // ✅ Enfermedad 1-2 en dropdown
   int _illnessLevel = 1;
-  String _illnessDescription = Collection.defaultIllnessDescription(1);
 
   @override
   void initState() {
     super.initState();
-    _loadCattle();
+
     if (widget.collection != null) {
       _fillForm(widget.collection!);
     }
+
+    _loadCattle();
   }
 
   void _fillForm(Collection collection) {
     _dateController.text = collection.date;
     _litresController.text = collection.litres.toString();
     _densityController.text = collection.density.toString();
-    _observationController.text = collection.observation ?? '';
+    _observationController.text = _capitalizeFirst(
+      collection.observation ?? '',
+    );
+    _illnessLevel = (collection.illness == 2) ? 2 : 1;
+  }
 
-    // ✅ carga illness del registro (si viene null -> 1)
-    final ill = (collection.illness == 2) ? 2 : 1;
-    _illnessLevel = ill;
+  String _capitalizeFirst(String text) {
+    final value = text.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (value.isEmpty) return value;
+    return value[0].toUpperCase() + value.substring(1).toLowerCase();
+  }
 
-    // ✅ si ya tiene descripción, úsala; si no, usa default
-    _illnessDescription =
-        (collection.illnessDescription != null &&
-                collection.illnessDescription!.trim().isNotEmpty)
-            ? collection.illnessDescription!.trim()
-            : Collection.defaultIllnessDescription(ill);
+  double? _normalizeNumber(String text) {
+    return double.tryParse(text.trim().replaceAll(',', '.'));
   }
 
   Future<void> _loadCattle() async {
@@ -70,12 +72,16 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
       final cattle = await CattleRepository.getAll();
       if (!mounted) return;
 
-      // ✅ SOLO el ganado requerido (cattle fijo)
       final onlyThis = cattle.where((c) => c.id == widget.cattleId).toList();
 
       setState(() {
         _cattleList = onlyThis;
-        _selectedCattle = onlyThis.isNotEmpty ? onlyThis.first : null;
+
+        if (onlyThis.isNotEmpty) {
+          _selectedCattle = onlyThis.first;
+        } else {
+          _selectedCattle = null;
+        }
       });
 
       if (_selectedCattle == null && mounted) {
@@ -108,9 +114,14 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
     }
   }
 
+  String? _validateDate(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Ingrese la fecha';
+    return null;
+  }
+
   String? _validateLitres(String? v) {
     if (v == null || v.trim().isEmpty) return 'Ingrese los litros';
-    final value = double.tryParse(v.trim());
+    final value = double.tryParse(v.trim().replaceAll(',', '.'));
     if (value == null) return 'Ingrese un número válido';
     if (value <= 0) return 'Los litros deben ser mayor a 0';
     if (value > 200) return 'Litros fuera de rango';
@@ -119,7 +130,7 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
 
   String? _validateDensity(String? v) {
     if (v == null || v.trim().isEmpty) return 'Ingrese la densidad';
-    final value = double.tryParse(v.trim());
+    final value = double.tryParse(v.trim().replaceAll(',', '.'));
     if (value == null) return 'Densidad inválida';
     if (value < 0.9 || value > 1.2) {
       return 'Densidad fuera de rango (0.9 - 1.2)';
@@ -137,17 +148,85 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
     if (v == null) return;
     setState(() {
       _illnessLevel = (v == 2) ? 2 : 1;
-      _illnessDescription = Collection.defaultIllnessDescription(_illnessLevel);
     });
   }
 
+  Future<List<Collection>> _getCollectionsForValidation() async {
+    return await CollectionCattleRepository.getAllByCattle(widget.cattleId);
+  }
+
+  Future<bool> _isDuplicateDate(String date) async {
+    final collections = await _getCollectionsForValidation();
+    final newDate = date.trim();
+
+    for (final item in collections) {
+      final sameId =
+          widget.collection?.id != null && item.id == widget.collection!.id;
+      if (sameId) continue;
+
+      if (item.date.trim() == newDate) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _isDuplicateLitres(String litresText) async {
+    final collections = await _getCollectionsForValidation();
+    final newLitres = _normalizeNumber(litresText);
+    if (newLitres == null) return false;
+
+    for (final item in collections) {
+      final sameId =
+          widget.collection?.id != null && item.id == widget.collection!.id;
+      if (sameId) continue;
+
+      if (item.litres == newLitres) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Future<bool> _isDuplicateDensity(String densityText) async {
+    final collections = await _getCollectionsForValidation();
+    final newDensity = _normalizeNumber(densityText);
+    if (newDensity == null) return false;
+
+    for (final item in collections) {
+      final sameId =
+          widget.collection?.id != null && item.id == widget.collection!.id;
+      if (sameId) continue;
+
+      if (item.density == newDensity) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   Future<void> _saveForm() async {
+    if (_isLoading) return;
+
+    FocusScope.of(context).unfocus();
+
     if (!_formKey.currentState!.validate()) return;
 
     if (_selectedCattle == null || _selectedCattle!.id == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No se pudo determinar el ganado')),
+      );
+      return;
+    }
+
+    if (_isEditing && widget.collection?.id == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se puede editar: el registro no tiene id'),
+          backgroundColor: Colors.red,
+        ),
       );
       return;
     }
@@ -168,26 +247,73 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
     setState(() => _isLoading = true);
 
     try {
-      final litres = double.parse(_litresController.text.trim());
-      final density = double.parse(_densityController.text.trim());
+      final formattedObservation = _capitalizeFirst(
+        _observationController.text,
+      );
 
-      // ✅ Usa el dropdown (1-2) y guarda descripción
+      final existsDate = await _isDuplicateDate(_dateController.text);
+      if (existsDate) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ya existe una recolección con esa fecha'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final existsLitres = await _isDuplicateLitres(_litresController.text);
+      if (existsLitres) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ya existe una recolección con esos litros'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final existsDensity = await _isDuplicateDensity(_densityController.text);
+      if (existsDensity) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ya existe una recolección con esa densidad'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final litres = double.parse(
+        _litresController.text.trim().replaceAll(',', '.'),
+      );
+      final density = double.parse(
+        _densityController.text.trim().replaceAll(',', '.'),
+      );
+
       final collection = Collection(
         id: widget.collection?.id,
         date: _dateController.text.trim(),
         litres: litres,
         illness: _illnessLevel,
-        illnessDescription: _illnessDescription,
         density: density,
         observation:
-            _observationController.text.trim().isNotEmpty
-                ? _observationController.text.trim()
-                : null,
-        cattleId: widget.cattleId, // ✅ FIJO
+            formattedObservation.isNotEmpty ? formattedObservation : null,
+        cattleId: widget.cattleId,
         cattle: _selectedCattle,
         companyId: companyId,
         sync: 1,
       );
+
+      debugPrint("EDITANDO: $_isEditing");
+      debugPrint("ID ACTUAL: ${widget.collection?.id}");
+      debugPrint("OBJETO A ENVIAR: ${collection.toMap()}");
 
       bool success;
 
@@ -203,27 +329,32 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
 
       if (success) {
         widget.onSave();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(
-              const SnackBar(
-                content: Text('Recolección guardada exitosamente'),
-              ),
-            )
-            .closed
-            .then((_) {
-              if (mounted) Navigator.pop(context);
-            });
+        Navigator.pop(context, true);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isEditing
+                  ? 'Recolección actualizada exitosamente'
+                  : 'Recolección guardada exitosamente',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No se pudo guardar la recolección')),
+          const SnackBar(
+            content: Text('No se pudo guardar la recolección'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
       debugPrint("❌ Error al guardar recolección: $e");
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -241,137 +372,160 @@ class _CollectionCattleFormState extends State<CollectionCattleForm> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isMobile = size.width < 700;
+    final dialogMaxWidth = isMobile ? size.width * 0.92 : 520.0;
+
     return AlertDialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: isMobile ? 12 : 24,
+        vertical: 16,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(_isEditing ? 'Editar Recolección' : 'Agregar Recolección'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: SizedBox(
-            width: 500,
-            child: Column(
-              children: [
-                TextFormField(
-                  controller: _dateController,
-                  readOnly: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Fecha',
-                    prefixIcon: Icon(Icons.date_range),
-                    border: OutlineInputBorder(),
-                    suffixIcon: Icon(Icons.calendar_today),
+      title: Text(
+        _isEditing ? 'Editar Recolección' : 'Agregar Recolección',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          color: Color(0xFF2C3E50),
+        ),
+      ),
+      content: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogMaxWidth,
+          maxHeight: size.height * 0.78,
+        ),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: SizedBox(
+              width: 500,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _dateController,
+                    readOnly: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Fecha',
+                      prefixIcon: Icon(Icons.date_range),
+                      border: OutlineInputBorder(),
+                      suffixIcon: Icon(Icons.calendar_today),
+                    ),
+                    onTap: _pickDate,
+                    validator: _validateDate,
                   ),
-                  onTap: _pickDate,
-                  validator:
-                      (v) =>
-                          (v == null || v.isEmpty) ? 'Ingrese la fecha' : null,
-                ),
-                const SizedBox(height: 12),
-
-                TextFormField(
-                  controller: _litresController,
-                  decoration: const InputDecoration(
-                    labelText: 'Litros',
-                    prefixIcon: Icon(Icons.water_drop),
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _litresController,
+                    decoration: const InputDecoration(
+                      labelText: 'Litros',
+                      prefixIcon: Icon(Icons.water_drop),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: _validateLitres,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    value: _illnessLevel,
+                    items: const [
+                      DropdownMenuItem(value: 1, child: Text('1')),
+                      DropdownMenuItem(value: 2, child: Text('2')),
+                    ],
+                    onChanged: _isLoading ? null : _onIllnessChanged,
+                    decoration: const InputDecoration(
+                      labelText: 'Enfermedad (1-2)',
+                      prefixIcon: Icon(Icons.healing),
+                      border: OutlineInputBorder(),
+                    ),
                   ),
-                  validator: _validateLitres,
-                ),
-                const SizedBox(height: 12),
-
-                // ✅ Dropdown (1-2) + descripción
-                DropdownButtonFormField<int>(
-                  value: _illnessLevel,
-                  items: const [
-                    DropdownMenuItem(value: 1, child: Text('1')),
-                    DropdownMenuItem(value: 2, child: Text('2')),
-                  ],
-                  onChanged: _onIllnessChanged,
-                  decoration: const InputDecoration(
-                    labelText: 'Enfermedad (1-2)',
-                    prefixIcon: Icon(Icons.healing),
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _densityController,
+                    decoration: const InputDecoration(
+                      labelText: 'Densidad',
+                      prefixIcon: Icon(Icons.scale),
+                      border: OutlineInputBorder(),
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    validator: _validateDensity,
                   ),
-                ),
-                const SizedBox(height: 8),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    'Descripción: $_illnessDescription',
-                    style: const TextStyle(fontSize: 13),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _observationController,
+                    decoration: const InputDecoration(
+                      labelText: 'Observación (opcional)',
+                      prefixIcon: Icon(Icons.comment),
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: _validateObservation,
                   ),
-                ),
-                const SizedBox(height: 12),
-
-                TextFormField(
-                  controller: _densityController,
-                  decoration: const InputDecoration(
-                    labelText: 'Densidad',
-                    prefixIcon: Icon(Icons.scale),
-                    border: OutlineInputBorder(),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<Cattle>(
+                    value: _selectedCattle,
+                    decoration: const InputDecoration(
+                      labelText: 'Ganado',
+                      prefixIcon: Icon(Icons.pets),
+                      border: OutlineInputBorder(),
+                    ),
+                    items:
+                        _cattleList
+                            .map(
+                              (c) => DropdownMenuItem(
+                                value: c,
+                                child: Text("${c.code} - ${c.name}"),
+                              ),
+                            )
+                            .toList(),
+                    onChanged: null,
+                    validator:
+                        (_) =>
+                            _selectedCattle == null
+                                ? 'Ganado no encontrado'
+                                : null,
                   ),
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
-                  validator: _validateDensity,
-                ),
-                const SizedBox(height: 12),
-
-                TextFormField(
-                  controller: _observationController,
-                  decoration: const InputDecoration(
-                    labelText: 'Observación (opcional)',
-                    prefixIcon: Icon(Icons.comment),
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: _validateObservation,
-                ),
-                const SizedBox(height: 12),
-
-                // ✅ Ganado fijo (solo muestra 1 opción)
-                DropdownButtonFormField<Cattle>(
-                  value: _selectedCattle,
-                  decoration: const InputDecoration(
-                    labelText: 'Ganado',
-                    prefixIcon: Icon(Icons.pets),
-                    border: OutlineInputBorder(),
-                  ),
-                  items:
-                      _cattleList
-                          .map(
-                            (c) => DropdownMenuItem(
-                              value: c,
-                              child: Text("${c.code} - ${c.name}"),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: null, // fijo
-                  validator:
-                      (_) =>
-                          _selectedCattle == null
-                              ? 'Ganado no encontrado'
-                              : null,
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
       ),
+      actionsPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       actions: [
         TextButton(
           onPressed: _isLoading ? null : () => Navigator.pop(context),
+          style: TextButton.styleFrom(
+            foregroundColor: Colors.white,
+            backgroundColor: Colors.red,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           child: const Text('Cancelar'),
         ),
         ElevatedButton.icon(
           onPressed: _isLoading ? null : _saveForm,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green.shade700,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
           icon:
               _isLoading
                   ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
                   )
                   : const Icon(Icons.save),
           label: Text(_isEditing ? 'Actualizar' : 'Guardar'),
