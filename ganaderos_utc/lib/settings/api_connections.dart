@@ -6,9 +6,9 @@ import 'dart:convert';
 
 class ApiConnection {
   // CAMBIA AQUÍ TU IP LOCAL O DEL SERVIDOR
-  static String url = "http://192.168.56.101:3000/api";
+  //static String url = "http://192.168.56.101:3000/api";
   //static String url = "http://172.16.32.110:3000/api"; // para pre-prod
-  //static String url = "https://api.allorigins.win/raw?url=https://utcgen.utc.edu.ec/api";
+  static String url = "https://utcgen-api.damisoft-ec.com/api";
 
   // ---------------------------------------------------------------------------
   // 🔵 LOGIN - POST /api/users/auth
